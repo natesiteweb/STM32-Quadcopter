@@ -11,7 +11,7 @@ RM := rm -rf
 -include USB_DEVICE/Target/subdir.mk
 -include USB_DEVICE/App/subdir.mk
 -include Middlewares/ST/STM32_USB_Device_Library/Core/Src/subdir.mk
--include Middlewares/ST/STM32_USB_Device_Library/Class/DFU/Src/subdir.mk
+-include Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Src/subdir.mk
 -include Drivers/STM32F4xx_HAL_Driver/Src/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/subdir.mk
@@ -50,8 +50,8 @@ f4Quadcopter.bin \
 all: f4Quadcopter.elf secondary-outputs
 
 # Tool invocations
-f4Quadcopter.elf: $(OBJS) $(USER_OBJS) C:\Users\Nate\STM32CubeIDE\workspace_1.4.0\f4Quadcopter\STM32F405RGTX_FLASH.ld
-	arm-none-eabi-gcc -o "f4Quadcopter.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Nate\STM32CubeIDE\workspace_1.4.0\f4Quadcopter\STM32F405RGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="f4Quadcopter.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+f4Quadcopter.elf: $(OBJS) $(USER_OBJS) C:\Users\Nate\STM32CubeIDE\workspace_1.4.0\STM32-Quadcopter\f4Quadcopter\STM32F405RGTX_FLASH.ld
+	arm-none-eabi-gcc -o "f4Quadcopter.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\Nate\STM32CubeIDE\workspace_1.4.0\STM32-Quadcopter\f4Quadcopter\STM32F405RGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="f4Quadcopter.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

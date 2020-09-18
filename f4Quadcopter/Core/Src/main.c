@@ -30,6 +30,7 @@
 
 #include "usbd_cdc_if.h"
 #include "string.h"
+#include "mainlogic.h"
 
 /* USER CODE END Includes */
 
@@ -72,8 +73,6 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 
-  uint8_t data[2] = "hi";
-
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -103,14 +102,15 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
+  main_setup();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_Delay(10000);
-	  CDC_Transmit_FS(data, 2);
+	  main_loop();
 
     /* USER CODE END WHILE */
 

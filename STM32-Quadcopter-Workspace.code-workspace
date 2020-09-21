@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "f1TelemComputer",
+			"path": "f1TelemComputer"
+		},
+		{
+			"name": "f4FlightController",
+			"path": "f4FlightController"
+		}
+	],
+	"settings": {}
+}

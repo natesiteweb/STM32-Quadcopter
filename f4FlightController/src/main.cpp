@@ -2,6 +2,7 @@
 #include "Wire.h"
 #include "imu.h"
 #include "string.h"
+#include "tim_IO.h"
 
 #define IMU_ADDRESS 0x68
 
@@ -16,13 +17,18 @@ TwoWire Wire2(PB11, PB10);
 
 char buf_to_send[40] = "Hello";
 
+int32_t frequencyRead, frequencyRead1 = 1500, frequencyRead2 = 1500, frequencyRead3 = 995, frequencyRead4 = 1500, frequencyRead5 = 995, frequencyRead6 = 995, input_freq = 0, throttle = 995;
+int32_t esc1Channel, esc2Channel, esc3Channel, esc4Channel;
+int32_t esc1_output, esc2_output, esc3_output, esc4_output;
+
 void setup()
 {
+  Timers_Setup();
   delay(500);
   SerialUSB.begin();
 
-  Wire.begin();
   Wire.setClock((uint32_t)400000);
+  Wire.begin();
 
   Wire2.setClock((uint32_t)400000);
   Wire2.begin();
@@ -37,13 +43,13 @@ void setup()
   blink_timer = millis();
   delay(10000);
 
-  Wire.beginTransmission(0x50);
+  /*Wire.beginTransmission(0x50);
   Wire.write(0x00);
   Wire.write(0x00);
   Wire.write(0x3E);
-  Wire.endTransmission();
+  Wire.endTransmission();*/
 
-  delay(1000);
+  //delay(1000);
 
   SerialUSB.print("Accessing address 0: ");
   uint8_t read_byte;
@@ -66,6 +72,18 @@ void loop()
     imu_timer = micros();
     ReadIMU(IMU_ADDRESS);
     //SerialUSB.println(gyro_x_val);
+
+    ESC1Timer->setCaptureCompare(4, frequencyRead3);
+
+    SerialUSB.print(raw_gyro_x);
+    SerialUSB.print(" ");
+    SerialUSB.print(frequencyRead1);
+    SerialUSB.print(" ");
+    SerialUSB.print(frequencyRead2);
+    SerialUSB.print(" ");
+    SerialUSB.print(frequencyRead3);
+    SerialUSB.print(" ");
+    SerialUSB.println(frequencyRead4);
   }
 
   if (millis() - blink_timer > 250)

@@ -74,6 +74,14 @@ void loop()
     //SerialUSB.println(gyro_x_val);
 
     ESC1Timer->setCaptureCompare(4, frequencyRead3);
+    ESC1Timer->setCaptureCompare(3, frequencyRead3);
+    ESC1Timer->setCaptureCompare(2, frequencyRead3);
+    ESC1Timer->setCaptureCompare(1, frequencyRead3);
+
+    ESC2Timer->setCaptureCompare(4, frequencyRead3);
+    ESC2Timer->setCaptureCompare(3, frequencyRead3);
+    ESC2Timer->setCaptureCompare(2, frequencyRead3);
+    ESC2Timer->setCaptureCompare(1, frequencyRead3);
 
     SerialUSB.print(raw_gyro_x);
     SerialUSB.print(" ");

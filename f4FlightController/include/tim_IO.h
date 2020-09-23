@@ -10,7 +10,7 @@ void Update_IT_callback(void);
 void Compare_IT_callback(void);
 void Timers_Setup(void);
 
-extern HardwareTimer *ESC1Timer;
+extern HardwareTimer *ESC1Timer, *ESC2Timer;
 
 extern int32_t frequencyRead, frequencyRead1, frequencyRead2, frequencyRead3, frequencyRead4, frequencyRead5, frequencyRead6, input_freq;
 

@@ -4,7 +4,7 @@
 #define PPM PA0
 
 HardwareTimer *PPMTimer;
-HardwareTimer *ESC1Timer;
+HardwareTimer *ESC1Timer, *ESC2Timer;
 
 uint32_t channelRising, channelFalling;
 volatile uint32_t FrequencyMeasured, DutycycleMeasured, LastPeriodCapture = 0, CurrentCapture, HighStateMeasured;
@@ -45,13 +45,20 @@ void Timers_Setup()
     input_freq = PPMTimer->getTimerClkFreq() / PPMTimer->getPrescaleFactor();
 
     ESC1Timer = new HardwareTimer(TIM8);
+    ESC2Timer = new HardwareTimer(TIM3);
 
     ESC1Timer->setMode(4, TIMER_OUTPUT_COMPARE_PWM1, PC9);  //ESC1 FL
     ESC1Timer->setMode(3, TIMER_OUTPUT_COMPARE_PWM1, PC8);  //ESC2 FR
     ESC1Timer->setMode(2, TIMER_OUTPUT_COMPARE_PWM1, PC7);  //ESC3 BR
     ESC1Timer->setMode(1, TIMER_OUTPUT_COMPARE_PWM1, PC6);  //ESC4 BL
 
+    ESC2Timer->setMode(4, TIMER_OUTPUT_COMPARE_PWM1, PB1);  //5
+    ESC2Timer->setMode(3, TIMER_OUTPUT_COMPARE_PWM1, PB0);  //6
+    ESC2Timer->setMode(2, TIMER_OUTPUT_COMPARE_PWM1, PA7);  //7
+    ESC2Timer->setMode(1, TIMER_OUTPUT_COMPARE_PWM1, PA6);  //8
+
     ESC1Timer->setOverflow(20000, MICROSEC_FORMAT);//20000 - 50hz(Servo), 5000 - 200hz(ESC)
+    ESC2Timer->setOverflow(20000, MICROSEC_FORMAT);
 
     ESC1Timer->attachInterrupt(Update_IT_callback);
     ESC1Timer->attachInterrupt(4, Compare_IT_callback);
@@ -59,7 +66,14 @@ void Timers_Setup()
     ESC1Timer->attachInterrupt(2, Compare_IT_callback);
     ESC1Timer->attachInterrupt(1, Compare_IT_callback);
 
+    ESC2Timer->attachInterrupt(Update_IT_callback);
+    ESC2Timer->attachInterrupt(4, Compare_IT_callback);
+    ESC2Timer->attachInterrupt(3, Compare_IT_callback);
+    ESC2Timer->attachInterrupt(2, Compare_IT_callback);
+    ESC2Timer->attachInterrupt(1, Compare_IT_callback);
+
     ESC1Timer->resume();
+    ESC2Timer->resume();
 
     ESC1Timer->setCaptureCompare(4, 1000, MICROSEC_COMPARE_FORMAT);
 }

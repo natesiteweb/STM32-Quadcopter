@@ -7,6 +7,10 @@
 		{
 			"name": "f4FlightController",
 			"path": "f4FlightController"
+		},
+		{
+			"name": "f1TelemReceiver",
+			"path": "f1TelemReceiver"
 		}
 	],
 	"settings": {}

@@ -4,9 +4,8 @@
 
 #define MY_ADDRESS 0x04
 
-#define CE_pin PB12
-#define CSN_pin PA8
-#define IRQ_pin PA11
+#define CE_pin PB8
+#define CSN_pin PB12
 #define MOSI_pin PB15
 #define MISO_pin PB14
 #define SCK_pin PB13
@@ -19,6 +18,7 @@ void transmit(byte, byte, byte);
 void NRF_set_RX_payload(byte, byte);
 void NRF_get_address(byte, byte);
 void NRF_ClearInterrupts(void);
+void get_data(void);
 
 SPIClass rfspi(MOSI_pin, MISO_pin, SCK_pin);
 byte data_in[32], data2, data3;
@@ -31,31 +31,33 @@ volatile bool i2c_receive_flag = false;
 
 void setup()
 {
-  pinMode(PA6, OUTPUT);
-  pinMode(PA7, OUTPUT);
+  //pinMode(PA6, OUTPUT);
+  pinMode(PC13, OUTPUT);
 
   Serial.begin(115200);
 
   delay(5000);
   NRF_Init();
   NRF_set_RX_payload(0, 3);
-  NRF_get_address(7, 0);
-  NRFwrite_bit_write(0, 0, 1);//register#, bit#, and value 0 or 1, ::  0,0,1 RX Mode
-  NRFwrite_bit_write(0, 1, 1);//register, bit, and value 0,1,1 PowerUP
-  NRFwrite_bit_write(0, 4, 1);//RT Mask turns off the RT interrupt
-  NRFwrite_bit_write(0, 5, 1);//TX Mask turns off the TX interrupt
+  NRF_get_address(7, 1);
+  NRFwrite_bit_write(0, 0, 1); //register#, bit#, and value 0 or 1, ::  0,0,1 RX Mode
+  NRFwrite_bit_write(0, 1, 1); //register, bit, and value 0,1,1 PowerUP
+  NRFwrite_bit_write(0, 4, 1); //RT Mask turns off the RT interrupt
+  NRFwrite_bit_write(0, 5, 1); //TX Mask turns off the TX interrupt
   NRFwrite_bit_write(0, 6, 1);
   //Serial3.begin(9600);
 
   digitalWrite(CSN_pin, LOW);
-  data_in[0] = rfspi.transfer(B11100010);//flush RX
+  data_in[0] = rfspi.transfer(B11100010); //flush RX
   digitalWrite(CSN_pin, HIGH);
   digitalWrite(CSN_pin, LOW);
-  data_in[0] = rfspi.transfer(B11100001);//flush TX
+  data_in[0] = rfspi.transfer(B11100001); //flush TX
   digitalWrite(CSN_pin, HIGH);
 
-  NRF_ClearInterrupts();//clears any interrupts
+  NRF_ClearInterrupts(); //clears any interrupts
   delay(100);
+
+  digitalWrite(PC13, HIGH);
 
   //Wire.setSDA(PB7);
   //Wire.setSCL(PB6);
@@ -64,10 +66,35 @@ void setup()
   //Wire.onReceive(I2C_Receive);
 }
 
+byte testState = 0;
+
 void loop()
 {
-  transmit(0x34, 0x51, 0x23);
-  delay(100);
+  //transmit(0x02, 0x51, 0x23);
+
+  NRF_get_address(7, 0);
+
+  if (bitRead(data_in[1], 6))
+  {
+    get_data();
+
+    if(data_in[1] == 0x34 && data_in[2] == 0x51 && data_in[3] == 0x23)
+    {
+      testState = (~testState) & 0x01;
+
+      digitalWrite(PC13, testState);
+    }
+
+    Serial.print(data_in[1], HEX);
+    Serial.print(" ");
+    Serial.print(data_in[2], HEX);
+    Serial.print(" ");
+    Serial.println(data_in[3], HEX);
+
+    NRFwrite_bit_write(7, 6, 1); //clear the RX interrupt flag
+  }
+
+  delay(5);
 
   /*if(i2c_receive_flag)
   {
@@ -90,7 +117,7 @@ void NRF_Init()
   digitalWrite(CE_pin, HIGH);
   digitalWrite(CSN_pin, HIGH);
   rfspi.begin();
-  Serial.println("SPI Started");
+  Serial.println("rfspi Started");
 }
 
 void NRF_set_RX_payload(byte pipe, byte bytes) //Set RF payload size
@@ -103,6 +130,26 @@ void NRF_set_RX_payload(byte pipe, byte bytes) //Set RF payload size
   Serial.println("Setup RX Payload");
 }
 
+void get_data()
+{ // get data start get data start get data start get data start get data start
+  // this routine is called when the IRQ pin is pulled LOW by the NRF
+
+  int i;
+  digitalWrite(CSN_pin, LOW);
+  data_in[0] = rfspi.transfer(B01100001); //read the payload
+  data_in[1] = rfspi.transfer(B00000000);
+  data_in[2] = rfspi.transfer(B00000000);
+  data_in[3] = rfspi.transfer(B00000000);
+  digitalWrite(CSN_pin, HIGH);
+
+  digitalWrite(CSN_pin, LOW);
+  data_in[0] = rfspi.transfer(B11100010); //flush RX
+  digitalWrite(CSN_pin, HIGH);
+
+  //NRFwrite_bit_write(7, 6, 1); //clear the RX interrupt flag
+
+} //     END   get  data     END   get  data     END   get  data     END   get  data     END   get  data
+
 void NRFwrite_bit_write(byte address, byte bit_add, byte val)
 { //   start bit write   start bit write   start bit write
   //This routine writes single bits of a register, without affecting the rest of the register
@@ -113,7 +160,7 @@ void NRFwrite_bit_write(byte address, byte bit_add, byte val)
   else
     bitClear(data_in[1], bit_add); //clear it if not
 
-  digitalWrite(CSN_pin, LOW);              //now we'll write the modified data back in
+  digitalWrite(CSN_pin, LOW);                //now we'll write the modified data back in
   data_in[0] = rfspi.transfer(32 + address); //a write to a register adds 32
   data_in[1] = rfspi.transfer(data_in[1]);   //write the modified register
   digitalWrite(CSN_pin, HIGH);
@@ -333,50 +380,49 @@ void NRF_get_address(byte address, byte info)
   }          //if 1
 } // END get_address END get_address END get_address END get_address END get_address END get_address END get_address
 
-void NRF_ClearInterrupts(){//    start clear interrupts      start clear interrupts      start clear interrupts  
- //there are three interrupt flags in the NRF.  Thsi routine checks them, and if set, it will clear them
- 
-  NRF_get_address(7, 0);//RT interrupt
-  if(bitRead(data_in[1], 4))
-  NRFwrite_bit_write(7,4,1);
-  
-  NRF_get_address(7, 0);//TX interrupt
-  if(bitRead(data_in[1], 5))
-  NRFwrite_bit_write(7,5,1);
-  
-  NRF_get_address(7, 0);//RX interrupt
-  if(bitRead(data_in[1], 6))
-  NRFwrite_bit_write(7,6,1);
+void NRF_ClearInterrupts()
+{ //    start clear interrupts      start clear interrupts      start clear interrupts
+  //there are three interrupt flags in the NRF.  Thsi routine checks them, and if set, it will clear them
 
-}//   END clear interrupts   END clear interrupts   END clear interrupts   END clear interrupts
+  NRF_get_address(7, 0); //RT interrupt
+  if (bitRead(data_in[1], 4))
+    NRFwrite_bit_write(7, 4, 1);
 
+  NRF_get_address(7, 0); //TX interrupt
+  if (bitRead(data_in[1], 5))
+    NRFwrite_bit_write(7, 5, 1);
 
-void transmit(byte mode, byte pin, byte value){//     transmit start     transmit start     transmit start
+  NRF_get_address(7, 0); //RX interrupt
+  if (bitRead(data_in[1], 6))
+    NRFwrite_bit_write(7, 6, 1);
+
+} //   END clear interrupts   END clear interrupts   END clear interrupts   END clear interrupts
+
+void transmit(byte mode, byte pin, byte value)
+{ //     transmit start     transmit start     transmit start
   //mode pin and value don't mena anything yet, but they will be
-  
+
   digitalWrite(CSN_pin, LOW);
-  data_in[0] = rfspi.transfer(B11100001);//flush TX, get rid of anything that might be in there
-  digitalWrite(CSN_pin, HIGH);  
-  
-  
-  
+  data_in[0] = rfspi.transfer(B11100001); //flush TX, get rid of anything that might be in there
+  digitalWrite(CSN_pin, HIGH);
+
   digitalWrite(CSN_pin, LOW);
-  data_in[0] = rfspi.transfer(B10100000);//load TX payload
-  data_in[1] = rfspi.transfer(mode);//action digital Read
-  data_in[2] = rfspi.transfer(pin);//pin number
+  data_in[0] = rfspi.transfer(B10100000); //load TX payload
+  data_in[1] = rfspi.transfer(mode);      //action digital Read
+  data_in[2] = rfspi.transfer(pin);       //pin number
   data_in[3] = rfspi.transfer(value);
   digitalWrite(CSN_pin, HIGH);
-   
-  digitalWrite(CE_pin, LOW);//pull CE pin LOW
-  delay(1);//small delay
-  NRFwrite_bit_write(0, 0, 0);//go into TX mode
-  delay(1);//small delay
-  digitalWrite(CE_pin, HIGH);
-  delay(1);//this is the time CE pin must be HIGH for before going back into RX mode
-  //delay(1) seems to work best for this.  any longer or shorter doesn't work as well
-  NRFwrite_bit_write(0, 0, 1);//go back into RX mode
 
-}//    end  transmit    end  transmit    end  transmit    end  transmit    end  transmit
+  digitalWrite(CE_pin, LOW);   //pull CE pin LOW
+  delay(1);                    //small delay
+  NRFwrite_bit_write(0, 0, 0); //go into TX mode
+  delay(1);                    //small delay
+  digitalWrite(CE_pin, HIGH);
+  delay(1); //this is the time CE pin must be HIGH for before going back into RX mode
+  //delay(1) seems to work best for this.  any longer or shorter doesn't work as well
+  NRFwrite_bit_write(0, 0, 1); //go back into RX mode
+
+} //    end  transmit    end  transmit    end  transmit    end  transmit    end  transmit
 
 void I2C_Receive(int howMany)
 {

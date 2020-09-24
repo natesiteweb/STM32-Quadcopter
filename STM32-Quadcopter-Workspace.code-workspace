@@ -11,6 +11,10 @@
 		{
 			"name": "f1TelemReceiver",
 			"path": "f1TelemReceiver"
+		},
+		{
+			"name": "leoTelemReceiver",
+			"path": "leoTelemReceiver"
 		}
 	],
 	"settings": {}

@@ -17,5 +17,9 @@
 			"path": "leoTelemReceiver"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"files.associations": {
+			"random": "cpp"
+		}
+	}
 }

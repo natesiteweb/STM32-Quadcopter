@@ -2,7 +2,7 @@
 #include "Wire.h"
 #include "imu.h"
 
-void SetupIMU(uint8_t IMU_ADDRESS)
+void SetupIMU()
 {
   Wire.beginTransmission(IMU_ADDRESS);  //Wake
   Wire.write(0x6B);
@@ -25,15 +25,23 @@ void SetupIMU(uint8_t IMU_ADDRESS)
   Wire.endTransmission();
 }
 
-void ReadIMU(uint8_t IMU_ADDRESS)
+void ReadIMU()
 {
   Wire.beginTransmission(IMU_ADDRESS);
-  Wire.write(0x43);
+  Wire.write(0x3B);
   Wire.endTransmission();
 
-  Wire.requestFrom((uint8_t)IMU_ADDRESS, (uint8_t)2);
+  Wire.requestFrom(IMU_ADDRESS, (uint8_t)14);
 
-  raw_gyro_x = (Wire.read() << 8) | Wire.read();
+  raw_acc_x = Wire.read() << 8 | Wire.read();
+  raw_acc_y = Wire.read() << 8 | Wire.read();
+  raw_acc_z = Wire.read() << 8 | Wire.read();
+  imu_temp = Wire.read() << 8 | Wire.read();
+  raw_gyro_x = Wire.read() << 8 | Wire.read();
+  raw_gyro_y = Wire.read() << 8 | Wire.read();
+  raw_gyro_z = Wire.read() << 8 | Wire.read();
 
   gyro_x_val = (float)raw_gyro_x / 65.5;
+  gyro_y_val = (float)raw_gyro_y / 65.5;
+  gyro_z_val = (float)raw_gyro_z / 65.5;
 }

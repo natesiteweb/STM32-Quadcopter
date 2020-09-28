@@ -57,8 +57,8 @@ void Timers_Setup()
     ESC2Timer->setMode(2, TIMER_OUTPUT_COMPARE_PWM1, PA7);  //7
     ESC2Timer->setMode(1, TIMER_OUTPUT_COMPARE_PWM1, PA6);  //8
 
-    ESC1Timer->setOverflow(20000, MICROSEC_FORMAT);//20000 - 50hz(Servo), 5000 - 200hz(ESC)
-    ESC2Timer->setOverflow(20000, MICROSEC_FORMAT);
+    ESC1Timer->setOverflow(5000, MICROSEC_FORMAT);//20000 - 50hz(Servo), 5000 - 200hz(ESC)
+    ESC2Timer->setOverflow(5000, MICROSEC_FORMAT);
 
     ESC1Timer->attachInterrupt(Update_IT_callback);
     ESC1Timer->attachInterrupt(4, Compare_IT_callback);
@@ -75,7 +75,15 @@ void Timers_Setup()
     ESC1Timer->resume();
     ESC2Timer->resume();
 
-    ESC1Timer->setCaptureCompare(4, 1000, MICROSEC_COMPARE_FORMAT);
+    ESC1Timer->setCaptureCompare(4, 1000);
+    ESC1Timer->setCaptureCompare(3, 1000);
+    ESC1Timer->setCaptureCompare(2, 1000);
+    ESC1Timer->setCaptureCompare(1, 1000);
+
+    ESC2Timer->setCaptureCompare(4, 1000);
+    ESC2Timer->setCaptureCompare(3, 1000);
+    ESC2Timer->setCaptureCompare(2, 1000);
+    ESC2Timer->setCaptureCompare(1, 1000);
 }
 
 void Rollover_IT_callback(void)

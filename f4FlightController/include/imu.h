@@ -3,10 +3,14 @@
 
 #include "Arduino.h"
 
-extern int16_t raw_gyro_x;
-extern float gyro_x_val;
+extern uint8_t IMU_ADDRESS;
 
-void SetupIMU(uint8_t IMU_ADDRESS);
-void ReadIMU(uint8_t IMU_ADDRESS);
+extern int16_t raw_gyro_x, raw_gyro_y, raw_gyro_z;
+extern float gyro_x_val, gyro_y_val, gyro_z_val;
+extern int16_t imu_temp;
+extern int16_t raw_acc_x, raw_acc_y, raw_acc_z;
+
+void SetupIMU();
+void ReadIMU();
 
 #endif

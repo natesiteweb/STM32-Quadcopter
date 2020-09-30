@@ -52,35 +52,48 @@ void setup()
 
 byte testState = 0;
 
+uint8_t dummy_read;
+
 void loop()
 {
   if (radio_irq_flag == 1)
   {
     radio_irq_flag = 0;
     get_data();
-    NRF_Write_Bit(7, 6, 1); //Clean RX Interrupt
 
     for (int i = 0; i < received_data_len; i++)
     {
       Serial.write(received_data[i]);
     }
+
+    NRF_Write_Bit(7, 6, 1); //Clear RX Interrupt
   }
   else
   {
     if (Serial.available() > 0)
     {
-      ack_payload_width = 0;
-      ack_payload_buf_counter++;
-
-      while (Serial.available() > 0)
+      if (ack_payload_buf_counter < 30)
       {
-        ack_payload_from_serial[ack_payload_width] = Serial.read();
-        ack_payload_buf[ack_payload_buf_counter].payload[ack_payload_width] = ack_payload_from_serial[ack_payload_width];
+        ack_payload_width = 0;
+        ack_payload_buf_counter++;
 
-        ack_payload_width++;
+        while (Serial.available() > 0)
+        {
+          ack_payload_from_serial[ack_payload_width] = Serial.read();
+          ack_payload_buf[ack_payload_buf_counter].payload[ack_payload_width] = ack_payload_from_serial[ack_payload_width];
+
+          ack_payload_width++;
+        }
+
+        ack_payload_buf[ack_payload_buf_counter].width = ack_payload_width;
       }
-
-      ack_payload_buf[ack_payload_buf_counter].width = ack_payload_width;
+      else
+      {
+        while (Serial.available() > 0)
+        {
+          dummy_read = Serial.read();
+        }
+      }
     }
   }
 }

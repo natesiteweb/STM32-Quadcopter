@@ -37,5 +37,11 @@ typedef union
 extern payload_buf ack_payload_buf[32];
 extern uint8_t ack_payload_buf_counter;
 
+typedef union
+{
+    int16_t num;
+    uint8_t data[2];
+} int16_union;
+
 //volatile
 #endif

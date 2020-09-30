@@ -12,8 +12,11 @@ byte data_in[34];
 * Packets to be updated automatically
 * 0: Gyro 
 */
-data_packet_pointer packet_buf[32];
-uint8_t packet_buf_counter = 0;
+data_packet_pointer auto_packet_buf[32];
+uint8_t auto_packet_buf_counter = 0;
+
+data_packet packet_buf[32];     //Packet buffer FIFO from F4 master
+uint8_t packet_buf_counter = 0; //Amount of packets in buffer ^
 
 int sent_packet_counter = 0;
 int ack_packet_counter = 0;
@@ -25,7 +28,6 @@ uint64_t pps_timer = 0;
 
 uint64_t packet_lag_timer;
 uint32_t min_packet_lag = 2500;
-
 
 void NRF_Init()
 {
@@ -96,21 +98,66 @@ float test_angle = 0;
 
 void radio_loop()
 {
-    if (waiting_for_ack == 0 && micros() - packet_lag_timer > min_packet_lag)
+    if (waiting_for_ack == 0 && micros() - packet_lag_timer > min_packet_lag) //Send buffer from F4 master first, then send automatic packets
     {
         packet_lag_timer = micros();
         //packet_buf_counter++;
 
-        //strcpy((char *)test_buf, "Hello World");
-        NRF_Send_Packet(packet_buf[packet_buf_counter].payload, (uint8_t)packet_buf[packet_buf_counter].id, (uint8_t)packet_buf[packet_buf_counter].width - 1);
+        if (packet_buf_counter > 0)
+        {
+            digitalWrite(CSN_pin, LOW);
+            data_in[0] = rfspi.transfer(B11100001); //flush TX, get rid of anything that might be in there
+            digitalWrite(CSN_pin, HIGH);
 
-        packet_buf_counter++;
+            delayMicroseconds(100);
 
-        if(packet_buf_counter >= packet_count)
-            packet_buf_counter = 0;
+            digitalWrite(CSN_pin, LOW);
+            data_in[0] = rfspi.transfer(B10100000); //load TX payload
+
+            for (int i = 0; i < packet_buf[0].width; i++)
+            {
+                data_in[i + 1] = rfspi.transfer(packet_buf[0].payload[i]);
+            }
+
+            digitalWrite(CSN_pin, HIGH);
+
+            waiting_for_ack = 1;
+            sent_packet_counter++;
+
+            digitalWrite(CE_pin, LOW); //pull CE pin LOW
+            delayMicroseconds(500);    //small delay
+            NRF_Write_Bit(0, 0, 0);    //go into TX mode
+            //delay(1);//small delay
+            digitalWrite(CE_pin, HIGH);
+
+            if (packet_buf_counter > 1)
+            {
+                for (int i = 0; i < packet_buf_counter - 1; i++)
+                {
+                    //packet_buf[i] = packet_buf[i + 1];
+                    packet_buf[i].width = packet_buf[i + 1].width;
+
+                    for (int j = 0; j < packet_buf[i + 1].width; j++)
+                    {
+                        packet_buf[i].payload[j] = packet_buf[i + 1].payload[j];
+                    }
+                }
+            }
+
+            packet_buf_counter--;
+        }
+        else if (auto_packet_count > 0)
+        {
+            NRF_Auto_Send_Packet(auto_packet_buf[auto_packet_buf_counter].payload, (uint8_t)auto_packet_buf[auto_packet_buf_counter].id, (uint8_t)auto_packet_buf[auto_packet_buf_counter].width - 1);
+
+            auto_packet_buf_counter++;
+
+            if (auto_packet_buf_counter >= auto_packet_count)
+                auto_packet_buf_counter = 0;
+        }
     }
 
-    if (radio_irq_flag)
+    if (radio_irq_flag == 1)
     {
         radio_irq_flag = 0;
 
@@ -139,7 +186,7 @@ void radio_loop()
                     ack_width = packet_width;
                 }
 
-                if(received_data[0] != 0x00)
+                if (received_data[0] != 0x00)
                     radio_receive_flag = 1;
 
                 digitalWrite(CSN_pin, HIGH);
@@ -165,7 +212,7 @@ void radio_loop()
     }
 }
 
-void NRF_Send_Packet(uint8_t *buf[32], uint8_t id, uint8_t buf_width)
+void NRF_Auto_Send_Packet(uint8_t *buf[32], uint8_t id, uint8_t buf_width)
 {
     digitalWrite(CSN_pin, LOW);
     data_in[0] = rfspi.transfer(B11100001); //flush TX, get rid of anything that might be in there

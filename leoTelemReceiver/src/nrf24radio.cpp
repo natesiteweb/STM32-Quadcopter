@@ -114,12 +114,12 @@ void NRF_Set_Ack_Payload()
 
     if (ack_payload_buf_counter > 0)
     {
-        ack_payload_buf_counter--;
-
-        for (int i = 1; i < 31; i++)
+        for (int i = 1; i < ack_payload_buf_counter; i++)
         {
             ack_payload_buf[i] = ack_payload_buf[i + 1];
         }
+
+        ack_payload_buf_counter--;
     }
 
     digitalWrite(CSN_pin, HIGH);

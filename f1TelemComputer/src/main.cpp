@@ -22,6 +22,7 @@ HardwareSerial Serial3(PB11, PB10);
 
 uint8_t received_num;
 volatile uint8_t wire_buf[40];
+volatile int wire_buf_width;
 volatile bool i2c_receive_flag = false;
 
 uint8_t waiting_for_ack = 0;
@@ -31,7 +32,7 @@ uint8_t radio_receive_flag;
 uint8_t radio_transmit_flag;
 uint8_t radio_retransmit_flag;
 
-uint8_t packet_count = 0;
+uint8_t auto_packet_count = 0;
 
 /////////-TELEMETRY DATA-/////////
 
@@ -45,17 +46,17 @@ void setup()
   pinMode(PA7, OUTPUT);
   pinMode(IRQ_pin, INPUT_PULLUP);
 
-  Serial.begin(57600);
+  //Serial.begin(115200);
 
   delay(5000);
   NRF_Init();
 
-  packet_buf[0].id = GYRO_PACKET;
-  PopulatePacketBuf(packet_buf[0].payload, &gyro_x, 0);
-  PopulatePacketBuf(packet_buf[0].payload, &gyro_y, 2);
-  PopulatePacketBuf(packet_buf[0].payload, &gyro_z, 4);
-  packet_buf[0].width = 7; //3 * sizeof(int16_t) + 1(byte for id)
-  packet_count = 1;
+  /*auto_packet_buf[0].id = GYRO_PACKET;
+  PopulatePacketBuf(auto_packet_buf[0].payload, &gyro_x, 0);
+  PopulatePacketBuf(auto_packet_buf[0].payload, &gyro_y, 2);
+  PopulatePacketBuf(auto_packet_buf[0].payload, &gyro_z, 4);
+  auto_packet_buf[0].width = 7; //3 * sizeof(int16_t) + 1(byte for id)*/
+  auto_packet_count = 0;
 
   //Serial3.begin(9600);
 
@@ -70,11 +71,13 @@ void setup()
   Wire.onReceive(I2C_Receive);
 }
 
+int16_union test_union;
+
 void loop()
 {
   radio_loop();
 
-  if (millis() - pps_timer >= 1000)
+  /*if (millis() - pps_timer >= 1000)
   {
     pps_timer = millis();
 
@@ -83,27 +86,51 @@ void loop()
     Serial.print(" ACKs: ");
     Serial.print(ack_packet_counter);
     Serial.print(" X: ");
-    Serial.print(((float)gyro_x) / 65.5);
+    Serial.print(gyro_x);
     Serial.print(" Y: ");
-    Serial.print(((float)gyro_y) / 65.5);
+    Serial.print(gyro_y);
     Serial.print(" Z: ");
-    Serial.println(((float)gyro_z) / 65.5);
+    Serial.println(gyro_z);
 
     sent_packet_counter = 0;
     ack_packet_counter = 0;
-  }
+  }*/
+
+  sent_packet_counter = 0;
+  ack_packet_counter = 0;
 
   if (i2c_receive_flag)
   {
     i2c_receive_flag = false;
 
-    switch (wire_buf[0])
+    if (packet_buf_counter < 31)
     {
-    case GYRO_PACKET:
-      gyro_x = (((wire_buf[1] & 0xFF) << 8) | (wire_buf[2] & 0xFF));
-      gyro_y = (((wire_buf[3] & 0xFF) << 8) | (wire_buf[4] & 0xFF));
-      gyro_z = (((wire_buf[5] & 0xFF) << 8) | (wire_buf[6] & 0xFF));
-      break;
+
+      for (int i = 0; i < wire_buf[39]; i++)
+      {
+        packet_buf[packet_buf_counter].payload[i] = wire_buf[i];
+      }
+
+      packet_buf[packet_buf_counter].width = 7; //PAYLOAD LENGTH IS BADDD
+
+      packet_buf_counter++;
+
+      switch (wire_buf[0])
+      {
+      case GYRO_PACKET:
+        test_union.data[0] = wire_buf[1];
+        test_union.data[1] = wire_buf[2];
+        gyro_x = test_union.num;
+
+        test_union.data[0] = wire_buf[3];
+        test_union.data[1] = wire_buf[4];
+        gyro_y = test_union.num;
+
+        test_union.data[0] = wire_buf[5];
+        test_union.data[1] = wire_buf[6];
+        gyro_z = test_union.num;
+        break;
+      }
     }
   }
 }
@@ -111,6 +138,7 @@ void loop()
 void I2C_Receive(int howMany)
 {
   Wire.readBytes((uint8_t *)wire_buf, howMany);
+  wire_buf[39] = (uint8_t)howMany;
 
   i2c_receive_flag = true;
 }

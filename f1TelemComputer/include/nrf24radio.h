@@ -8,7 +8,7 @@ void NRF_Init(void);
 void _RF24_IRQ(void);
 void radio_loop(void);
 void NRF_Clear_Interrupts(void);
-void NRF_Send_Packet(uint8_t *buf[32], uint8_t id, uint8_t buf_width);
+void NRF_Auto_Send_Packet(uint8_t *buf[32], uint8_t id, uint8_t buf_width);
 void NRF_Get_Address(byte address);
 void NRF_Write_Bit(byte address, byte bit_add, byte val);
 
@@ -32,6 +32,11 @@ extern uint8_t radio_transmit_flag;
 extern uint8_t radio_retransmit_flag;
 
 extern uint8_t received_data[33];
-extern data_packet_pointer packet_buf[32];
+extern data_packet_pointer auto_packet_buf[32];
+
+extern uint8_t auto_packet_count;
+
+extern data_packet packet_buf[32];
+extern uint8_t packet_buf_counter;
 
 #endif

@@ -9,7 +9,7 @@ uint8_t IMU_ADDRESS = 0x68;
 
 void SetupAutomaticPacketI2C(void);
 
-int16_t raw_gyro_x, raw_gyro_y, raw_gyro_z;
+int16_t raw_gyro_x = 0, raw_gyro_y = 0, raw_gyro_z = 0;
 float gyro_x_val, gyro_y_val, gyro_z_val;
 int16_t imu_temp;
 int16_t raw_acc_x, raw_acc_y, raw_acc_z;

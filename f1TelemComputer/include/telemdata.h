@@ -8,8 +8,6 @@ void PopulatePacketBuf(uint8_t **buf, uint32_t *num, int start_index);
 void PopulatePacketBuf(uint8_t **buf, uint16_t *num, int start_index);
 void PopulatePacketBuf(uint8_t **buf, int16_t *num, int start_index);
 
-extern uint8_t packet_count;
-
 uint8_t *Float_To_Bytes(float num);
 uint8_t *UInt32_To_Bytes(uint32_t num);
 uint8_t *UInt16_To_Bytes(uint16_t num);
@@ -57,5 +55,11 @@ typedef struct
     uint8_t *payload[31];
     uint8_t width;
 } data_packet_pointer;
+
+typedef struct
+{
+    uint8_t payload[32];
+    uint8_t width;
+} data_packet;
 
 #endif

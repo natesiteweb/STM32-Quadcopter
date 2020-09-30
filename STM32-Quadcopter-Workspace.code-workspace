@@ -9,10 +9,6 @@
 			"path": "f4FlightController"
 		},
 		{
-			"name": "f1TelemReceiver",
-			"path": "f1TelemReceiver"
-		},
-		{
 			"name": "leoTelemReceiver",
 			"path": "leoTelemReceiver"
 		}

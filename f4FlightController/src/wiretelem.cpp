@@ -18,7 +18,7 @@ void telem_wire_setup()
 
 void telem_loop()
 {
-    if (millis() - telem_timer > 20)
+    if (millis() - telem_timer > 5)
     {
         telem_timer = millis();
 

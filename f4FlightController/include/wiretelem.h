@@ -9,12 +9,18 @@ void telem_wire_setup(void);
 
 void PopulatePacketBuf(uint8_t **buf, float *num, int start_index);
 void PopulatePacketBuf(uint8_t **buf, uint32_t *num, int start_index);
+void PopulatePacketBuf(uint8_t **buf, int32_t *num, int start_index);
 void PopulatePacketBuf(uint8_t **buf, uint16_t *num, int start_index);
 void PopulatePacketBuf(uint8_t **buf, int16_t *num, int start_index);
+void PopulatePacketBuf(uint8_t **buf, uint8_t *num, int start_index);
 
+void PopulateManualPacket(float num);
+void PopulateManualPacket(uint8_t num);
+float ReadManualPacket_Float();
 
+void TelemPrintDebug(char txt_to_print[30], uint8_t message_length);
 
-extern uint64_t telem_timer;
+extern uint32_t telem_timer;
 
 typedef struct
 {
@@ -23,12 +29,33 @@ typedef struct
     uint8_t width;
 } data_packet_pointer;
 
-extern data_packet_pointer packet_buf[32];
-extern uint8_t packet_count;
+typedef struct
+{
+    uint8_t id;
+    uint8_t payload[31];
+    uint8_t width;
+} data_packet;
+
+extern data_packet_pointer auto_packet_buf[32];
+extern uint8_t auto_packet_count;
+extern data_packet packet_buf[32];
 
 enum
 {
-    GYRO_PACKET = 0x01
+    GYRO_PACKET = 0x01,
+    PID_GAIN_FIRST_PACKET = 0x03,
+    ALTITUDE_PACKET = 0x06,
+    ALTITUDE_SET_PACKET = 0x07,
+    PID_GAIN_SECOND_PACKET = 0x04,
+    PRINT_PACKET = 0x09,
+
+    ALTITUDE_REQUEST = 0xF8,
+    ALTITUDE_SET_REQUEST = 0xF9,
+    PID_GAIN_FIRST_REQUEST = 0xF3,
+    PID_GAIN_SECOND_REQUEST = 0xF4,
+    PID_GAIN_FIRST_UPDATE_REQUEST = 0xF5,
+    PID_GAIN_SECOND_UPDATE_REQUEST = 0xF6,
+    CALIBRATE_ESC_REQUEST = 0xFB
 };
 
 #endif

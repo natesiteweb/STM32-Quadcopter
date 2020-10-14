@@ -18,16 +18,21 @@ uint8_t auto_packet_buf_counter = 0;
 data_packet packet_buf[32];     //Packet buffer FIFO from F4 master
 uint8_t packet_buf_counter = 0; //Amount of packets in buffer ^
 
+data_packet wire_packet_buf[32];     //Packet buffer from THIS to F4 or ground control to F4
+uint8_t wire_packet_buf_counter = 0; //Amount of packets in buffer ^
+
 int sent_packet_counter = 0;
 int ack_packet_counter = 0;
 
 uint8_t ack_width = 0;
 uint8_t ack_payload_test = 0;
 
-uint64_t pps_timer = 0;
+uint32_t pps_timer = 0;
 
-uint64_t packet_lag_timer;
+uint32_t packet_lag_timer;
 uint32_t min_packet_lag = 2500;
+
+uint8_t packet_width = 0;
 
 void NRF_Init()
 {
@@ -89,12 +94,6 @@ void NRF_Init()
 
     packet_lag_timer = micros();
 }
-
-byte packet_width = 0;
-
-char test_buf[12];
-
-float test_angle = 0;
 
 void radio_loop()
 {
@@ -180,14 +179,33 @@ void radio_loop()
                 //digitalWrite(CE_pin, LOW);
                 data_in[0] = rfspi.transfer(B01100001); //read the payload
 
+                radio_receive_flag = 0;
+
                 for (int i = 0; i < packet_width; i++)
                 {
                     received_data[i] = rfspi.transfer(B00000000);
-                    ack_width = packet_width;
+
+                    if(i == 0 && received_data[0] != 0x00)
+                        radio_receive_flag = 1;
+
+                    if(radio_receive_flag == 1)
+                    {
+                        wire_packet_buf[wire_packet_buf_counter].payload[i] = received_data[i];
+                    }
                 }
 
-                if (received_data[0] != 0x00)
-                    radio_receive_flag = 1;
+                ack_width = packet_width;
+
+                if (radio_receive_flag == 1)
+                {
+                    for(int i = packet_width; i < 32; i++)
+                    {
+                        wire_packet_buf[wire_packet_buf_counter].payload[i] = 0x00;
+                    }
+
+                    wire_packet_buf[wire_packet_buf_counter].width = packet_width;
+                    wire_packet_buf_counter++;
+                }
 
                 digitalWrite(CSN_pin, HIGH);
 

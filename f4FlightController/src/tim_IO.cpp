@@ -1,5 +1,6 @@
 #include "Arduino.h"
 #include "tim_IO.h"
+#include "eepromi2c.h"
 
 #define PPM PA0
 
@@ -11,6 +12,8 @@ volatile uint32_t FrequencyMeasured, DutycycleMeasured, LastPeriodCapture = 0, C
 
 volatile uint32_t rolloverCompareCount = 0;
 uint32_t currentChannelPPM;
+
+uint32_t calibrate_timer;
 
 void Timers_Setup()
 {
@@ -47,18 +50,18 @@ void Timers_Setup()
     ESC1Timer = new HardwareTimer(TIM8);
     ESC2Timer = new HardwareTimer(TIM3);
 
-    ESC1Timer->setMode(4, TIMER_OUTPUT_COMPARE_PWM1, PC9);  //ESC1 FL
-    ESC1Timer->setMode(3, TIMER_OUTPUT_COMPARE_PWM1, PC8);  //ESC2 FR
-    ESC1Timer->setMode(2, TIMER_OUTPUT_COMPARE_PWM1, PC7);  //ESC3 BR
-    ESC1Timer->setMode(1, TIMER_OUTPUT_COMPARE_PWM1, PC6);  //ESC4 BL
+    ESC1Timer->setMode(4, TIMER_OUTPUT_COMPARE_PWM1, PC9); //ESC1 FL    servo1
+    ESC1Timer->setMode(3, TIMER_OUTPUT_COMPARE_PWM1, PC8); //ESC2 FR    servo2
+    ESC1Timer->setMode(2, TIMER_OUTPUT_COMPARE_PWM1, PC7); //ESC3 BR    servo3
+    ESC1Timer->setMode(1, TIMER_OUTPUT_COMPARE_PWM1, PC6); //ESC4 BL    servo4
 
-    ESC2Timer->setMode(4, TIMER_OUTPUT_COMPARE_PWM1, PB1);  //5
-    ESC2Timer->setMode(3, TIMER_OUTPUT_COMPARE_PWM1, PB0);  //6
-    ESC2Timer->setMode(2, TIMER_OUTPUT_COMPARE_PWM1, PA7);  //7
-    ESC2Timer->setMode(1, TIMER_OUTPUT_COMPARE_PWM1, PA6);  //8
+    ESC2Timer->setMode(4, TIMER_OUTPUT_COMPARE_PWM1, PB1); //5
+    ESC2Timer->setMode(3, TIMER_OUTPUT_COMPARE_PWM1, PB0); //6
+    ESC2Timer->setMode(2, TIMER_OUTPUT_COMPARE_PWM1, PA7); //7
+    ESC2Timer->setMode(1, TIMER_OUTPUT_COMPARE_PWM1, PA6); //8
 
-    ESC1Timer->setOverflow(5000, MICROSEC_FORMAT);//20000 - 50hz(Servo), 5000 - 200hz(ESC)
-    ESC2Timer->setOverflow(5000, MICROSEC_FORMAT);
+    ESC1Timer->setOverflow(5000, MICROSEC_FORMAT); //20000 - 50hz(Servo), 5000 - 200hz(ESC)
+    ESC2Timer->setOverflow(20000, MICROSEC_FORMAT);
 
     ESC1Timer->attachInterrupt(Update_IT_callback);
     ESC1Timer->attachInterrupt(4, Compare_IT_callback);
@@ -75,15 +78,35 @@ void Timers_Setup()
     ESC1Timer->resume();
     ESC2Timer->resume();
 
-    ESC1Timer->setCaptureCompare(4, 1000);
-    ESC1Timer->setCaptureCompare(3, 1000);
-    ESC1Timer->setCaptureCompare(2, 1000);
-    ESC1Timer->setCaptureCompare(1, 1000);
+    if (EEPROM_Single_Byte_Read(0x8000) == 0x01)
+    {
+        calibrate_timer = millis();
 
-    ESC2Timer->setCaptureCompare(4, 1000);
-    ESC2Timer->setCaptureCompare(3, 1000);
-    ESC2Timer->setCaptureCompare(2, 1000);
-    ESC2Timer->setCaptureCompare(1, 1000);
+        while (millis() - calibrate_timer < 8000)
+        {
+            ESC1Timer->setCaptureCompare(4, frequencyRead3, MICROSEC_COMPARE_FORMAT);
+            ESC1Timer->setCaptureCompare(3, frequencyRead3, MICROSEC_COMPARE_FORMAT);
+            ESC1Timer->setCaptureCompare(2, frequencyRead3, MICROSEC_COMPARE_FORMAT);
+            ESC1Timer->setCaptureCompare(1, frequencyRead3, MICROSEC_COMPARE_FORMAT);
+
+            ESC2Timer->setCaptureCompare(4, frequencyRead3, MICROSEC_COMPARE_FORMAT);
+            ESC2Timer->setCaptureCompare(3, frequencyRead3, MICROSEC_COMPARE_FORMAT);
+            ESC2Timer->setCaptureCompare(2, frequencyRead3, MICROSEC_COMPARE_FORMAT);
+            ESC2Timer->setCaptureCompare(1, frequencyRead3, MICROSEC_COMPARE_FORMAT);
+        }
+
+        EEPROM_Single_Byte_Write(0x8000, 0x00);
+    }
+
+    ESC1Timer->setCaptureCompare(4, 1000, MICROSEC_COMPARE_FORMAT);
+    ESC1Timer->setCaptureCompare(3, 1000, MICROSEC_COMPARE_FORMAT);
+    ESC1Timer->setCaptureCompare(2, 1000, MICROSEC_COMPARE_FORMAT);
+    ESC1Timer->setCaptureCompare(1, 1000, MICROSEC_COMPARE_FORMAT);
+
+    ESC2Timer->setCaptureCompare(4, 1000, MICROSEC_COMPARE_FORMAT);
+    ESC2Timer->setCaptureCompare(3, 1000, MICROSEC_COMPARE_FORMAT);
+    ESC2Timer->setCaptureCompare(2, 1000, MICROSEC_COMPARE_FORMAT);
+    ESC2Timer->setCaptureCompare(1, 1000, MICROSEC_COMPARE_FORMAT);
 }
 
 void Rollover_IT_callback(void)
@@ -146,10 +169,10 @@ void TIMINPUT_Capture_Falling_IT_callback(void)
 
 void Update_IT_callback(void)
 { // Update event correspond to Rising edge of PWM when configured in PWM1 mode
-  //digitalWrite(pin2, LOW); // pin2 will be complementary to pin
+    //digitalWrite(pin2, LOW); // pin2 will be complementary to pin
 }
 
 void Compare_IT_callback(void)
 { // Compare match event correspond to falling edge of PWM when configured in PWM1 mode
-  //digitalWrite(pin2, HIGH);
+    //digitalWrite(pin2, HIGH);
 }

@@ -28,9 +28,10 @@ volatile bool i2c_receive_flag = false;
 
 void setup()
 {
-  ack_payload_buf[0].payload[0] = 0x1C;
-  ack_payload_buf[0].payload[1] = 0x20;
-  ack_payload_buf[0].width = 2;
+  //Default ack payload
+  ack_payload_buf[0].payload[0] = 0x00;
+  ack_payload_buf[0].payload[1] = 0x00;
+  ack_payload_buf[0].width = 1;
   //pinMode(PA6, OUTPUT);
   pinMode(5, OUTPUT);
 

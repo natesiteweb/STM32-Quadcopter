@@ -2,6 +2,7 @@
 #include "Wire.h"
 #include "SPI.h"
 #include "nrf24radio.h"
+#include "gps.h"
 #include "telemdata.h"
 
 #define MY_ADDRESS 0x04
@@ -14,6 +15,7 @@ uint8_t MISO_pin = PB14;
 uint8_t SCK_pin = PB13;
 
 void I2C_Receive(int howMany);
+void I2C_Request(void);
 
 byte send_data[33];
 uint8_t received_data[33];
@@ -22,13 +24,12 @@ HardwareSerial Serial3(PB11, PB10);
 
 uint8_t received_num;
 volatile uint8_t wire_buf[40];
-volatile int wire_buf_width;
 volatile bool i2c_receive_flag = false;
 
 uint8_t waiting_for_ack = 0;
 
 volatile uint8_t radio_irq_flag;
-uint8_t radio_receive_flag;
+uint8_t radio_receive_flag = 0;
 uint8_t radio_transmit_flag;
 uint8_t radio_retransmit_flag;
 
@@ -46,6 +47,9 @@ void setup()
   pinMode(PA7, OUTPUT);
   pinMode(IRQ_pin, INPUT_PULLUP);
 
+  digitalWrite(PA6, LOW); //Blue
+  digitalWrite(PA7, LOW); //Green
+
   //Serial.begin(115200);
 
   delay(5000);
@@ -60,7 +64,10 @@ void setup()
 
   //Serial3.begin(9600);
 
-  delay(100);
+  delay(200);
+  Setup_GPS();
+  delay(200);
+  Serial2.end();
 
   pps_timer = millis();
 
@@ -69,12 +76,19 @@ void setup()
   Wire.begin(MY_ADDRESS);
 
   Wire.onReceive(I2C_Receive);
+  Wire.onRequest(I2C_Request);
 }
 
 int16_union test_union;
 
 void loop()
 {
+  /*while(Serial2.available() > 0)
+  {
+    char b = Serial2.read();
+    Serial.write(b);
+  }*/
+
   radio_loop();
 
   /*if (millis() - pps_timer >= 1000)
@@ -111,26 +125,15 @@ void loop()
         packet_buf[packet_buf_counter].payload[i] = wire_buf[i];
       }
 
-      packet_buf[packet_buf_counter].width = 7; //PAYLOAD LENGTH IS BADDD
+      packet_buf[packet_buf_counter].width = wire_buf[39]; //PAYLOAD LENGTH IS BADDD
 
       packet_buf_counter++;
 
-      switch (wire_buf[0])
+      /*switch (wire_buf[0])
       {
       case GYRO_PACKET:
-        test_union.data[0] = wire_buf[1];
-        test_union.data[1] = wire_buf[2];
-        gyro_x = test_union.num;
-
-        test_union.data[0] = wire_buf[3];
-        test_union.data[1] = wire_buf[4];
-        gyro_y = test_union.num;
-
-        test_union.data[0] = wire_buf[5];
-        test_union.data[1] = wire_buf[6];
-        gyro_z = test_union.num;
         break;
-      }
+      }*/
     }
   }
 }
@@ -141,4 +144,41 @@ void I2C_Receive(int howMany)
   wire_buf[39] = (uint8_t)howMany;
 
   i2c_receive_flag = true;
+}
+
+void I2C_Request()
+{
+  digitalWrite(PA6, HIGH);
+
+  if (wire_packet_buf_counter > 0)
+  {
+    digitalWrite(PA7, HIGH);
+
+    Wire.write(wire_packet_buf[0].payload, (size_t)32);
+
+    if (wire_packet_buf_counter > 1)
+    {
+      for (int i = 0; i < wire_packet_buf_counter - 1; i++)
+      {
+        //packet_buf[i] = packet_buf[i + 1];
+        wire_packet_buf[i].width = wire_packet_buf[i + 1].width;
+
+        for (int j = 0; j < wire_packet_buf[i + 1].width; j++)
+        {
+          wire_packet_buf[i].payload[j] = wire_packet_buf[i + 1].payload[j];
+        }
+      }
+    }
+
+    wire_packet_buf_counter--;
+  }
+  else
+  {
+    for (int i = 0; i < 32; i++)
+    {
+      wire_packet_buf[0].payload[i] = 0x00;
+    }
+
+    Wire.write(wire_packet_buf[0].payload, (size_t)32);
+  }
 }

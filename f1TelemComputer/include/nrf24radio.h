@@ -24,7 +24,7 @@ extern int sent_packet_counter;
 extern int ack_packet_counter;
 extern uint8_t ack_width;
 extern uint8_t ack_payload_test;
-extern uint64_t pps_timer;
+extern uint32_t pps_timer;
 
 extern volatile uint8_t radio_irq_flag;
 extern uint8_t radio_receive_flag;
@@ -38,5 +38,8 @@ extern uint8_t auto_packet_count;
 
 extern data_packet packet_buf[32];
 extern uint8_t packet_buf_counter;
+
+extern data_packet wire_packet_buf[32];
+extern uint8_t wire_packet_buf_counter;
 
 #endif

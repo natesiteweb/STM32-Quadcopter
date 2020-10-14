@@ -67,7 +67,7 @@ void setup()
   delay(200);
   Setup_GPS();
   delay(200);
-  Serial2.end();
+  //Serial2.end();
 
   pps_timer = millis();
 
@@ -90,6 +90,8 @@ void loop()
   }*/
 
   radio_loop();
+
+  Read_GPS();
 
   /*if (millis() - pps_timer >= 1000)
   {

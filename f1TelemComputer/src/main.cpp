@@ -83,12 +83,6 @@ int16_union test_union;
 
 void loop()
 {
-  /*while(Serial2.available() > 0)
-  {
-    char b = Serial2.read();
-    Serial.write(b);
-  }*/
-
   radio_loop();
 
   Read_GPS();
@@ -127,15 +121,9 @@ void loop()
         packet_buf[packet_buf_counter].payload[i] = wire_buf[i];
       }
 
-      packet_buf[packet_buf_counter].width = wire_buf[39]; //PAYLOAD LENGTH IS BADDD
+      packet_buf[packet_buf_counter].width = wire_buf[39];
 
       packet_buf_counter++;
-
-      /*switch (wire_buf[0])
-      {
-      case GYRO_PACKET:
-        break;
-      }*/
     }
   }
 }

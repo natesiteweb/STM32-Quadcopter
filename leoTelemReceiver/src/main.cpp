@@ -62,10 +62,12 @@ void loop()
     radio_irq_flag = 0;
     get_data();
 
-    for (int i = 0; i < received_data_len; i++)
+    /*for (int i = 0; i < received_data_len; i++)
     {
       Serial.write(received_data[i]);
-    }
+    }*/
+
+    Serial.write(received_data, received_data_len);
 
     NRF_Write_Bit(7, 6, 1); //Clear RX Interrupt
   }

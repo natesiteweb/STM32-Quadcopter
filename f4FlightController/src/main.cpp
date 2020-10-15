@@ -5,7 +5,7 @@
 #include "tim_IO.h"
 #include "wiretelem.h"
 #include "eepromi2c.h"
-#include "gyro_pid.h"
+#include "pid_logic.h"
 #include "bmp280.h"
 
 uint8_t IMU_ADDRESS = 0x68;
@@ -84,6 +84,10 @@ void setup()
   kp_altitude = EEPROM_Float_Read((uint16_t)0);
   ki_altitude = EEPROM_Float_Read((uint16_t)4);
   kd_altitude = EEPROM_Float_Read((uint16_t)8);
+
+  kp_gps = EEPROM_Float_Read((uint16_t)12);
+  ki_gps = EEPROM_Float_Read((uint16_t)16);
+  kd_gps = EEPROM_Float_Read((uint16_t)20);
 
   kp_pitch = kp_roll;
   ki_pitch = ki_roll;

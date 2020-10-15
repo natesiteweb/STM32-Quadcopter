@@ -15,8 +15,10 @@ void PopulatePacketBuf(uint8_t **buf, int16_t *num, int start_index);
 void PopulatePacketBuf(uint8_t **buf, uint8_t *num, int start_index);
 
 void PopulateManualPacket(float num);
+void PopulateManualPacket(int32_t num);
 void PopulateManualPacket(uint8_t num);
 float ReadManualPacket_Float();
+int32_t ReadManualPacket_Int32();
 
 void TelemPrintDebug(char txt_to_print[30], uint8_t message_length);
 
@@ -47,6 +49,7 @@ enum
     ALTITUDE_PACKET = 0x06,
     ALTITUDE_SET_PACKET = 0x07,
     PID_GAIN_SECOND_PACKET = 0x04,
+    GPS_PACKET = 0x08,
     PRINT_PACKET = 0x09,
 
     ALTITUDE_REQUEST = 0xF8,
@@ -57,5 +60,11 @@ enum
     PID_GAIN_SECOND_UPDATE_REQUEST = 0xF6,
     CALIBRATE_ESC_REQUEST = 0xFB
 };
+
+typedef union 
+{
+    int32_t num;
+    uint8_t data[4];
+} int32_union;
 
 #endif

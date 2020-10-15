@@ -3,7 +3,7 @@
 #include "imu.h"
 #include "tim_IO.h"
 #include "wiretelem.h"
-#include "gyro_pid.h"
+#include "pid_logic.h"
 #include "bmp280.h"
 
 float kp_roll, kp_pitch, kp_yaw;
@@ -35,6 +35,15 @@ uint8_t pid_altitude_over_time_index = 0;
 
 int32_t last_frequency6 = 1000;
 int32_t captured_throttle;
+
+float kp_gps;
+float ki_gps;
+float kd_gps;
+
+int32_t raw_latitude = 1;
+int32_t raw_longitude = 1;
+
+uint8_t sat_count = 0;
 
 void GyroPID()
 {

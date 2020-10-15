@@ -1,5 +1,5 @@
-#ifndef _GYRO_PID_H
-#define _GYRO_PID_H
+#ifndef _PID_LOGIC_H
+#define _PID_LOGIC_H
 
 #include "Arduino.h"
 
@@ -32,5 +32,14 @@ extern int32_t pid_roll_output, pid_pitch_output, pid_yaw_output;
 extern int32_t pid_altitude_output;
 
 extern int32_t esc1_output, esc2_output, esc3_output, esc4_output;
+
+extern float kp_gps;
+extern float ki_gps;
+extern float kd_gps;
+
+extern int32_t raw_latitude;
+extern int32_t raw_longitude;
+
+extern uint8_t sat_count;
 
 #endif

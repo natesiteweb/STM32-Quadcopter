@@ -2,7 +2,7 @@
 #include "Wire.h"
 #include "wiretelem.h"
 #include "eepromi2c.h"
-#include "gyro_pid.h"
+#include "pid_logic.h"
 #include "imu.h"
 #include "bmp280.h"
 
@@ -27,6 +27,8 @@ uint8_t telem_rate_counter = 0;
 uint8_t telem_read_counter = 0;
 
 uint8_t wire_receive_data[40];
+
+int32_union int32_u;
 
 void telem_wire_setup()
 {
@@ -120,9 +122,9 @@ void telem_loop()
                 PopulateManualPacket(kp_altitude);
                 PopulateManualPacket(ki_altitude);
                 PopulateManualPacket(kd_altitude);
-                //PopulateManualPacket(kp_yaw);
-                //PopulateManualPacket(ki_yaw);
-                //PopulateManualPacket(kd_yaw);
+                PopulateManualPacket(kp_gps);
+                PopulateManualPacket(ki_gps);
+                PopulateManualPacket(kd_gps);
                 packet_buf[packet_buf_counter].width = manual_packet_index + 1;
                 packet_buf_counter++;
                 break;
@@ -131,17 +133,17 @@ void telem_loop()
                 kp_altitude = ReadManualPacket_Float();
                 ki_altitude = ReadManualPacket_Float();
                 kd_altitude = ReadManualPacket_Float();
-                //kp_yaw = ReadManualPacket_Float();
-                //ki_yaw = ReadManualPacket_Float();
-                //kd_yaw = ReadManualPacket_Float();
+                kp_gps = ReadManualPacket_Float();
+                ki_gps = ReadManualPacket_Float();
+                kd_gps = ReadManualPacket_Float();
 
                 EEPROM_Clear_Buf();
                 EEPROM_Float_Write(0, kp_altitude);
                 EEPROM_Float_Write(4, ki_altitude);
                 EEPROM_Float_Write(8, kd_altitude);
-                //EEPROM_Float_Write(12, kp_yaw);
-                //EEPROM_Float_Write(16, ki_yaw);
-                //EEPROM_Float_Write(20, kd_yaw);
+                EEPROM_Float_Write(12, kp_gps);
+                EEPROM_Float_Write(16, ki_gps);
+                EEPROM_Float_Write(20, kd_gps);
                 EEPROM_Save_Page(32);
 
                 packet_buf[packet_buf_counter].id = PID_GAIN_SECOND_PACKET;
@@ -149,9 +151,9 @@ void telem_loop()
                 PopulateManualPacket(kp_altitude);
                 PopulateManualPacket(ki_altitude);
                 PopulateManualPacket(kd_altitude);
-                //PopulateManualPacket(kp_yaw);
-                //PopulateManualPacket(ki_yaw);
-                //PopulateManualPacket(kd_yaw);
+                PopulateManualPacket(kp_gps);
+                PopulateManualPacket(ki_gps);
+                PopulateManualPacket(kd_gps);
                 packet_buf[packet_buf_counter].width = manual_packet_index + 1;
                 packet_buf_counter++;
                 break;
@@ -173,6 +175,22 @@ void telem_loop()
                 packet_buf[packet_buf_counter].id = ALTITUDE_SET_PACKET;
                 manual_packet_index = 0;
                 PopulateManualPacket(bmp_setpoint);
+                packet_buf[packet_buf_counter].width = manual_packet_index + 1;
+                packet_buf_counter++;
+                break;
+            case GPS_PACKET:
+                manual_packet_index = 1;
+                raw_latitude = ReadManualPacket_Int32();
+                raw_longitude = ReadManualPacket_Int32();
+                sat_count = wire_receive_data[manual_packet_index];
+                //manual_packet_index++;
+
+                packet_buf[packet_buf_counter].id = GPS_PACKET;
+                manual_packet_index = 0;
+                PopulateManualPacket((uint8_t)0x00);
+                PopulateManualPacket((uint8_t)sat_count);
+                PopulateManualPacket((int32_t)raw_latitude);
+                PopulateManualPacket((int32_t)raw_longitude);
                 packet_buf[packet_buf_counter].width = manual_packet_index + 1;
                 packet_buf_counter++;
                 break;
@@ -294,6 +312,18 @@ void PopulateManualPacket(float num)
     manual_packet_index += 4;
 }
 
+void PopulateManualPacket(int32_t num)
+{
+    int32_u.num = num;
+
+    packet_buf[packet_buf_counter].payload[manual_packet_index] = int32_u.data[0];
+    packet_buf[packet_buf_counter].payload[manual_packet_index + 1] = int32_u.data[1];
+    packet_buf[packet_buf_counter].payload[manual_packet_index + 2] = int32_u.data[2];
+    packet_buf[packet_buf_counter].payload[manual_packet_index + 3] = int32_u.data[3];
+
+    manual_packet_index += 4;
+}
+
 void PopulateManualPacket(uint8_t num)
 {
     packet_buf[packet_buf_counter].payload[manual_packet_index] = num;
@@ -311,4 +341,16 @@ float ReadManualPacket_Float()
     manual_packet_index += 4;
 
     return float_u.num;
+}
+
+int32_t ReadManualPacket_Int32()
+{
+    int32_u.data[0] = wire_receive_data[manual_packet_index];
+    int32_u.data[1] = wire_receive_data[manual_packet_index + 1];
+    int32_u.data[2] = wire_receive_data[manual_packet_index + 2];
+    int32_u.data[3] = wire_receive_data[manual_packet_index + 3];
+
+    manual_packet_index += 4;
+
+    return int32_u.num;
 }

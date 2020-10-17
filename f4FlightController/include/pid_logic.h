@@ -5,6 +5,8 @@
 
 void GyroPID(void);
 void AltitudePID(void);
+void GPSPID(void);
+void ResetGPSVariables(void);
 
 extern uint8_t flight_mode;
 
@@ -37,8 +39,31 @@ extern float kp_gps;
 extern float ki_gps;
 extern float kd_gps;
 
+extern float pid_gps_roll_i, pid_gps_pitch_i;
+extern float calculated_lat_error, calculated_lon_error;
+extern float last_calculated_lat_error, last_calculated_lon_error;
+extern float lat_add, lon_add;
+
+extern uint32_t gps_timer;
+extern float gps_timer_modifier;
+
+extern int32_t gps_roll_modifier, gps_pitch_modifier;
+
+extern float latitude_error_over_time_total, longitude_error_over_time_total;
+extern float latitude_error_over_time[40], longitude_error_over_time[40];
+extern uint8_t gps_error_over_time_reading_index;
+
+extern int32_t latitude_table[40];
+extern int32_t longitude_table[40];
+
+extern int32_t lat_setpoint;
+extern int32_t lon_setpoint;
+
 extern int32_t raw_latitude;
 extern int32_t raw_longitude;
+extern int32_t last_raw_latitude;
+extern int32_t last_raw_longitude;
+extern uint8_t new_gps_data;
 
 extern uint8_t sat_count;
 

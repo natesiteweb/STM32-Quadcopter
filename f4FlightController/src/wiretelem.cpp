@@ -185,6 +185,21 @@ void telem_loop()
                 sat_count = wire_receive_data[manual_packet_index];
                 //manual_packet_index++;
 
+                new_gps_data = 1;
+                latitude_table[0] = raw_latitude;
+                longitude_table[0] = raw_longitude;
+                lat_setpoint = latitude_table[2];
+                lon_setpoint = longitude_table[2];
+
+                calculated_lat_error = (float)(raw_latitude - lat_setpoint);
+                calculated_lon_error = (float)(lon_setpoint - raw_longitude);
+
+                lat_add = (float)(raw_latitude - last_raw_latitude) / (float)10;
+                lon_add = (float)(last_raw_longitude - raw_longitude) / (float)10;
+
+                last_raw_latitude = raw_latitude;
+                last_raw_longitude = raw_longitude;
+
                 packet_buf[packet_buf_counter].id = GPS_PACKET;
                 manual_packet_index = 0;
                 PopulateManualPacket((uint8_t)0x00);

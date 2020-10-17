@@ -28,6 +28,7 @@ float angle_calculation_bias = 0.9985;
  * 1: Disarmed
  * 2: Manual; autolevel
  * 3: Manual; autolevel; altitude hold
+ * 4: Manual; autolevel; altitude hold; GPS hold
  **/
 uint8_t flight_mode = 1;
 
@@ -146,11 +147,13 @@ void loop()
     else if (pid_altitude_setpoint > bmp_setpoint + 0.05 && flight_mode == 3)
       pid_altitude_setpoint -= 0.00175;
 
+    ParseControllerInput();
+
     if ((bmp_reading_index + 1) % 5 == 0)
     {
       Calculate_Baro_Altitude();
 
-      if (frequencyRead6 > 1600)
+      if (flight_mode > 2)
         AltitudePID();
       else
       {
@@ -167,7 +170,10 @@ void loop()
       bmp_reading_index = 0;
     }
 
-    ParseControllerInput();
+    if (flight_mode == 4)
+    {
+      GPSPID();
+    }
 
     GyroPID();
 
@@ -191,14 +197,16 @@ void SetupAutomaticPacketI2C()
   auto_packet_buf[1].id = ALTITUDE_PACKET;
   PopulatePacketBuf(auto_packet_buf[1].payload, &bmp_altitude, 0);
   PopulatePacketBuf(auto_packet_buf[1].payload, &flight_mode, 4);
-  auto_packet_buf[1].width = 6;
+  PopulatePacketBuf(auto_packet_buf[1].payload, &gps_roll_modifier, 5);
+  PopulatePacketBuf(auto_packet_buf[1].payload, &gps_pitch_modifier, 9);
+  auto_packet_buf[1].width = 14;
 
   auto_packet_count = 2;
 }
 
 void ParseControllerInput()
 {
-  if(frequencyRead6 < 1300)
+  if (frequencyRead6 < 1300)
   {
     flight_mode = 1;
   }
@@ -211,11 +219,19 @@ void ParseControllerInput()
   }
   else if (frequencyRead6 > 1750)
   {
-    if (flight_mode != 3)
+    if (flight_mode != 4 && sat_count >= 3) //GPS hold
     {
-      flight_mode = 3;
+      flight_mode = 4;
       captured_throttle = frequencyRead3;
       altitude_pid_timer = micros() - 20000;
+      ResetGPSVariables();
+
+      latitude_table[2] = latitude_table[0];
+      longitude_table[2] = longitude_table[0];
+    }
+    else if(sat_count < 3)
+    {
+      flight_mode = 2;
     }
 
     throttle = pid_altitude_output + captured_throttle;

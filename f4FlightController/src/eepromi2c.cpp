@@ -3,6 +3,7 @@
 #include "eepromi2c.h"
 
 float_union float_u;
+int16_union int16_u;
 
 int address_index = 0;
 int page_index = 0;
@@ -50,6 +51,22 @@ float EEPROM_Float_Read(uint8_t buf_index)
     float_u.data[3] = eeprom_buf[buf_index + 3];
 
     return float_u.num;
+}
+
+void EEPROM_Int16_Write(uint8_t buf_index, int16_t num)
+{
+    int16_u.num = num;
+
+    eeprom_buf[buf_index] = int16_u.data[0];
+    eeprom_buf[buf_index + 1] = int16_u.data[1];
+}
+
+int16_t EEPROM_Int16_Read(uint8_t buf_index)
+{
+    int16_u.data[0] = eeprom_buf[buf_index];
+    int16_u.data[1] = eeprom_buf[buf_index + 1];
+
+    return int16_u.num;
 }
 
 void EEPROM_Single_Byte_Write(uint16_t address, uint8_t num)

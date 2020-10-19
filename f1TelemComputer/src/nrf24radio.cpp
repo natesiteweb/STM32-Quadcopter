@@ -3,6 +3,7 @@
 #include "nrf24radio.h"
 #include "telemdata.h"
 #include "string.h"
+#include "gps.h"
 
 SPIClass rfspi(MOSI_pin, MISO_pin, SCK_pin);
 
@@ -185,10 +186,23 @@ void radio_loop()
                 {
                     received_data[i] = rfspi.transfer(B00000000);
 
-                    if(i == 0 && received_data[0] != 0x00)
+                    if (i == 0 && received_data[0] != 0x00)
+                    {
                         radio_receive_flag = 1;
 
-                    if(radio_receive_flag == 1)
+                        if(received_data[0] == 0xF7)
+                        {
+                            is_calibrating = 1;
+                            is_calibrating_timer = millis();
+                        }
+                        else if(received_data[0] == 0xFA)
+                        {
+                            is_calibrating = 1;
+                            is_calibrating_timer = millis() + 6000;
+                        }
+                    }
+
+                    if (radio_receive_flag == 1)
                     {
                         wire_packet_buf[wire_packet_buf_counter].payload[i] = received_data[i];
                     }
@@ -196,9 +210,9 @@ void radio_loop()
 
                 ack_width = packet_width;
 
-                if (radio_receive_flag == 1)
+                if (radio_receive_flag == 1 && wire_packet_buf_counter < 30)
                 {
-                    for(int i = packet_width; i < 32; i++)
+                    for (int i = packet_width; i < 32; i++)
                     {
                         wire_packet_buf[wire_packet_buf_counter].payload[i] = 0x00;
                     }

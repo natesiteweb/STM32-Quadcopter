@@ -5,6 +5,7 @@
 #include "pid_logic.h"
 #include "imu.h"
 #include "bmp280.h"
+#include "compass.h"
 
 TwoWire Wire2(PB11, PB10);
 
@@ -29,6 +30,7 @@ uint8_t telem_read_counter = 0;
 uint8_t wire_receive_data[40];
 
 int32_union int32_u;
+uint32_union uint32_u;
 
 void telem_wire_setup()
 {
@@ -37,6 +39,7 @@ void telem_wire_setup()
 }
 
 uint8_t temp_led_state = 0;
+uint8_t gps_read_index;
 
 void telem_loop()
 {
@@ -61,15 +64,18 @@ void telem_loop()
 
             switch (wire_receive_data[0])
             {
+            case 0x00:
+                break;
             case 0xF7:
                 temp_led_state = (~temp_led_state) & 0x01;
                 digitalWrite(PC2, temp_led_state);
                 flight_mode = 1;
 
-                TelemPrintDebug((char *)"Calibrated.\n", 12);
+                //TelemPrintDebug((char *)"Calibrated.\n", 12);
 
                 CalibrateIMU();
                 Calibrate_BMP();
+                ResetTimers();
                 break;
             case PID_GAIN_FIRST_REQUEST:
                 packet_buf[packet_buf_counter].id = PID_GAIN_FIRST_PACKET;
@@ -159,7 +165,7 @@ void telem_loop()
                 break;
             case CALIBRATE_ESC_REQUEST:
                 EEPROM_Single_Byte_Write(0x8000, 0x01);
-                delay(1000);
+                //delay(1000);
                 break;
             case ALTITUDE_REQUEST: //If you click download on ground control
                 packet_buf[packet_buf_counter].id = ALTITUDE_SET_PACKET;
@@ -183,11 +189,20 @@ void telem_loop()
                 raw_latitude = ReadManualPacket_Int32();
                 raw_longitude = ReadManualPacket_Int32();
                 sat_count = wire_receive_data[manual_packet_index];
-                //manual_packet_index++;
+                manual_packet_index++;
+
+                battery_voltage = ((float)ReadManualPacket_UInt32()) * (float)0.004592;
 
                 new_gps_data = 1;
                 latitude_table[0] = raw_latitude;
                 longitude_table[0] = raw_longitude;
+
+                if (flight_mode < 4)
+                {
+                    latitude_table[2] = raw_latitude;
+                    longitude_table[2] = raw_longitude;
+                }
+
                 lat_setpoint = latitude_table[2];
                 lon_setpoint = longitude_table[2];
 
@@ -200,14 +215,43 @@ void telem_loop()
                 last_raw_latitude = raw_latitude;
                 last_raw_longitude = raw_longitude;
 
-                packet_buf[packet_buf_counter].id = GPS_PACKET;
-                manual_packet_index = 0;
-                PopulateManualPacket((uint8_t)0x00);
-                PopulateManualPacket((uint8_t)sat_count);
-                PopulateManualPacket((int32_t)raw_latitude);
-                PopulateManualPacket((int32_t)raw_longitude);
-                packet_buf[packet_buf_counter].width = manual_packet_index + 1;
-                packet_buf_counter++;
+                SendGPSPacket((uint8_t)0);
+                break;
+            case CALIBRATE_COMPASS_REQUEST:
+                flight_mode = 1;
+
+                //TelemPrintDebug((char *)"Calibrated Compass.\n", 20);
+
+                CalibrateCompass();
+                ResetTimers();
+                break;
+            case GPS_PACKET_UPDATE_REQUEST:
+                manual_packet_index = 1;
+                gps_read_index = wire_receive_data[manual_packet_index];
+                manual_packet_index++;
+
+                if (gps_read_index > 4)
+                {
+                    latitude_table[gps_read_index] = ReadManualPacket_Int32();
+                    longitude_table[gps_read_index] = ReadManualPacket_Int32();
+                }
+
+                break;
+            case GPS_PACKET_REQUEST: //Request hold position
+                SendGPSPacket((uint8_t)5);
+                break;
+            case GPS_HOLD_COPY_BUFFER_REQUEST: //Copy hold position buffer
+                latitude_table[3] = latitude_table[5];
+                longitude_table[3] = longitude_table[5];
+
+                latitude_table[4] = latitude_table[2];
+                longitude_table[4] = longitude_table[2];
+
+                lat_modifier_add = 0;
+                lon_modifier_add = 0;
+
+                lat_modifier = 0;
+                lon_modifier = 0;
                 break;
             }
         }
@@ -269,7 +313,19 @@ void TelemPrintDebug(char txt_to_print[30], uint8_t message_length)
     {
         PopulateManualPacket(((uint8_t)txt_to_print[i]));
     }
-    
+
+    packet_buf[packet_buf_counter].width = manual_packet_index + 1;
+    packet_buf_counter++;
+}
+
+void SendGPSPacket(uint8_t gps_index)
+{
+    packet_buf[packet_buf_counter].id = GPS_PACKET;
+    manual_packet_index = 0;
+    PopulateManualPacket((uint8_t)gps_index);
+    PopulateManualPacket((uint8_t)sat_count);
+    PopulateManualPacket((int32_t)latitude_table[gps_index]);
+    PopulateManualPacket((int32_t)longitude_table[gps_index]);
     packet_buf[packet_buf_counter].width = manual_packet_index + 1;
     packet_buf_counter++;
 }
@@ -368,4 +424,16 @@ int32_t ReadManualPacket_Int32()
     manual_packet_index += 4;
 
     return int32_u.num;
+}
+
+uint32_t ReadManualPacket_UInt32()
+{
+    uint32_u.data[0] = wire_receive_data[manual_packet_index];
+    uint32_u.data[1] = wire_receive_data[manual_packet_index + 1];
+    uint32_u.data[2] = wire_receive_data[manual_packet_index + 2];
+    uint32_u.data[3] = wire_receive_data[manual_packet_index + 3];
+
+    manual_packet_index += 4;
+
+    return uint32_u.num;
 }

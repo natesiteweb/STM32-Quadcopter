@@ -7,6 +7,8 @@
 void telem_loop(void);
 void telem_wire_setup(void);
 
+void SendGPSPacket(uint8_t gps_index);
+
 void PopulatePacketBuf(uint8_t **buf, float *num, int start_index);
 void PopulatePacketBuf(uint8_t **buf, uint32_t *num, int start_index);
 void PopulatePacketBuf(uint8_t **buf, int32_t *num, int start_index);
@@ -19,8 +21,12 @@ void PopulateManualPacket(int32_t num);
 void PopulateManualPacket(uint8_t num);
 float ReadManualPacket_Float();
 int32_t ReadManualPacket_Int32();
+uint32_t ReadManualPacket_UInt32();
 
 void TelemPrintDebug(char txt_to_print[30], uint8_t message_length);
+
+extern uint8_t telem_rate_counter;
+extern uint8_t telem_read_counter;
 
 extern uint32_t telem_timer;
 
@@ -52,13 +58,17 @@ enum
     GPS_PACKET = 0x08,
     PRINT_PACKET = 0x09,
 
-    ALTITUDE_REQUEST = 0xF8,
-    ALTITUDE_SET_REQUEST = 0xF9,
     PID_GAIN_FIRST_REQUEST = 0xF3,
     PID_GAIN_SECOND_REQUEST = 0xF4,
     PID_GAIN_FIRST_UPDATE_REQUEST = 0xF5,
     PID_GAIN_SECOND_UPDATE_REQUEST = 0xF6,
-    CALIBRATE_ESC_REQUEST = 0xFB
+    ALTITUDE_REQUEST = 0xF8,
+    ALTITUDE_SET_REQUEST = 0xF9,
+    CALIBRATE_COMPASS_REQUEST = 0xFA,
+    CALIBRATE_ESC_REQUEST = 0xFB,
+    GPS_PACKET_UPDATE_REQUEST = 0xFD,
+    GPS_PACKET_REQUEST = 0xFE,
+    GPS_HOLD_COPY_BUFFER_REQUEST = 0xE0
 };
 
 typedef union 
@@ -66,5 +76,11 @@ typedef union
     int32_t num;
     uint8_t data[4];
 } int32_union;
+
+typedef union 
+{
+    uint32_t num;
+    uint8_t data[4];
+} uint32_union;
 
 #endif

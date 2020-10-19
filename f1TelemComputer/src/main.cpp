@@ -38,6 +38,7 @@ uint8_t auto_packet_count = 0;
 /////////-TELEMETRY DATA-/////////
 
 int16_t gyro_x = 0, gyro_y = 0, gyro_z = 0;
+uint32_t battery_voltage = 0;
 
 //////////////////////////////////
 
@@ -81,8 +82,24 @@ void setup()
 
 int16_union test_union;
 
+uint32_t battery_read_timer;
+
 void loop()
 {
+  if(is_calibrating == 1)
+  {
+    if(millis() - is_calibrating_timer >= 11000)
+    {
+      is_calibrating = 0;
+    }
+  }
+
+  if(millis() - battery_read_timer >= 1000)
+  {
+    battery_read_timer = millis();
+    ReadBatteryVoltage();
+  }
+
   radio_loop();
 
   Read_GPS();
@@ -171,4 +188,9 @@ void I2C_Request()
 
     Wire.write(wire_packet_buf[0].payload, (size_t)32);
   }
+}
+
+void ReadBatteryVoltage()
+{
+  battery_voltage = analogRead(PB0);
 }

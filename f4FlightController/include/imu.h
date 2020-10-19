@@ -21,5 +21,6 @@ extern float acc_magnitude;
 void SetupIMU(void);
 void CalibrateIMU(void);
 void ReadIMU(bool calibrating);
+void ResetTimers(void);
 
 #endif

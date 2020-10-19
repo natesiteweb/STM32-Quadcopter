@@ -35,7 +35,7 @@ extern int32_t pid_altitude_output;
 
 extern int32_t esc1_output, esc2_output, esc3_output, esc4_output;
 
-extern float kp_gps;
+extern float kp_gps, kp_gps_actual;
 extern float ki_gps;
 extern float kd_gps;
 
@@ -66,5 +66,13 @@ extern int32_t last_raw_longitude;
 extern uint8_t new_gps_data;
 
 extern uint8_t sat_count;
+
+extern float lat_modifier;
+extern float lon_modifier;
+
+extern float lat_modifier_add;
+extern float lon_modifier_add;
+
+extern float battery_voltage;
 
 #endif

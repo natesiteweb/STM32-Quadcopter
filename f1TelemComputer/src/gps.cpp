@@ -20,7 +20,11 @@ uint8_t sat_count = 0;
 bool gps_fix = false;
 uint8_t new_gps_data = 0;
 
+uint8_t is_calibrating = 0;
+uint32_t is_calibrating_timer;
+
 int32_union int32_u;
+uint32_union uint32_u;
 
 void Setup_GPS()
 {
@@ -114,31 +118,42 @@ void Read_GPS()
             sat_count = (uint8_t)((int)nmea_message[45] - 48) * (uint8_t)10;
             sat_count += (uint8_t)((int)nmea_message[46] - 48);
 
-            wire_packet_buf[wire_packet_buf_counter].payload[0] = 0x08; //GPS_PACKET
-
-            int32_u.num = latitude;
-
-            wire_packet_buf[wire_packet_buf_counter].payload[1] = int32_u.data[0];
-            wire_packet_buf[wire_packet_buf_counter].payload[2] = int32_u.data[1];
-            wire_packet_buf[wire_packet_buf_counter].payload[3] = int32_u.data[2];
-            wire_packet_buf[wire_packet_buf_counter].payload[4] = int32_u.data[3];
-
-            int32_u.num = longitude;
-
-            wire_packet_buf[wire_packet_buf_counter].payload[5] = int32_u.data[0];
-            wire_packet_buf[wire_packet_buf_counter].payload[6] = int32_u.data[1];
-            wire_packet_buf[wire_packet_buf_counter].payload[7] = int32_u.data[2];
-            wire_packet_buf[wire_packet_buf_counter].payload[8] = int32_u.data[3];
-
-            wire_packet_buf[wire_packet_buf_counter].payload[9] = sat_count;
-
-            for (int i = 10; i < 32; i++)
+            if (is_calibrating == 0)
             {
-                wire_packet_buf[wire_packet_buf_counter].payload[i] = 0x00;
-            }
 
-            wire_packet_buf[wire_packet_buf_counter].width = 10;
-            wire_packet_buf_counter++;
+                wire_packet_buf[wire_packet_buf_counter].payload[0] = 0x08; //GPS_PACKET
+
+                int32_u.num = latitude;
+
+                wire_packet_buf[wire_packet_buf_counter].payload[1] = int32_u.data[0];
+                wire_packet_buf[wire_packet_buf_counter].payload[2] = int32_u.data[1];
+                wire_packet_buf[wire_packet_buf_counter].payload[3] = int32_u.data[2];
+                wire_packet_buf[wire_packet_buf_counter].payload[4] = int32_u.data[3];
+
+                int32_u.num = longitude;
+
+                wire_packet_buf[wire_packet_buf_counter].payload[5] = int32_u.data[0];
+                wire_packet_buf[wire_packet_buf_counter].payload[6] = int32_u.data[1];
+                wire_packet_buf[wire_packet_buf_counter].payload[7] = int32_u.data[2];
+                wire_packet_buf[wire_packet_buf_counter].payload[8] = int32_u.data[3];
+
+                wire_packet_buf[wire_packet_buf_counter].payload[9] = sat_count;
+
+                uint32_u.num = battery_voltage;
+
+                wire_packet_buf[wire_packet_buf_counter].payload[10] = uint32_u.data[0];
+                wire_packet_buf[wire_packet_buf_counter].payload[11] = uint32_u.data[1];
+                wire_packet_buf[wire_packet_buf_counter].payload[12] = uint32_u.data[2];
+                wire_packet_buf[wire_packet_buf_counter].payload[13] = uint32_u.data[3];
+
+                for (int i = 14; i < 32; i++)
+                {
+                    wire_packet_buf[wire_packet_buf_counter].payload[i] = 0x00;
+                }
+
+                wire_packet_buf[wire_packet_buf_counter].width = 14;
+                wire_packet_buf_counter++;
+            }
 
             new_gps_data = 1;
         }

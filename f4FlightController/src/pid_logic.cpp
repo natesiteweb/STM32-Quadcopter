@@ -5,6 +5,7 @@
 #include "wiretelem.h"
 #include "pid_logic.h"
 #include "bmp280.h"
+#include "compass.h"
 
 float kp_roll, kp_pitch, kp_yaw;
 float ki_roll, ki_pitch, ki_yaw;
@@ -36,7 +37,7 @@ uint8_t pid_altitude_over_time_index = 0;
 int32_t last_frequency6 = 1000;
 int32_t captured_throttle;
 
-float kp_gps;
+float kp_gps, kp_gps_actual;
 float ki_gps;
 float kd_gps;
 
@@ -57,7 +58,10 @@ uint8_t gps_error_over_time_reading_index = 0;
 /**
  * 0: Most recent GPS position
  * 1: Home setpoint
- * 2: Realtime setpoint
+ * 2: Realtime setpoint(Setpoint but interpolated)
+ * 3: Setpoint(not interpolated)
+ * 4: Last setpoint
+ * 5: Hold position buffer
 **/
 int32_t latitude_table[40];
 int32_t longitude_table[40];
@@ -72,6 +76,9 @@ int32_t last_raw_longitude = 1;
 uint8_t new_gps_data = 0;
 
 uint8_t sat_count = 0;
+
+int32_t gps_roll_modifier_north;
+int32_t gps_pitch_modifier_north;
 
 void GyroPID()
 {
@@ -99,7 +106,12 @@ void GyroPID()
     else
         pid_yaw_setpoint = 0;
 
-    if (flight_mode == 4) //GPS Hold
+    if(flight_mode >= 3)
+    {
+        throttle = pid_altitude_output + captured_throttle;
+    }
+
+    if (flight_mode >= 4) //GPS Hold
     {
         pid_roll_setpoint += gps_roll_modifier;
         pid_pitch_setpoint += gps_pitch_modifier;
@@ -270,8 +282,8 @@ void GPSPID()
 
         if (new_gps_data == 0)
         {
-            calculated_lat_error += lat_add * gps_timer_modifier;
-            calculated_lon_error += lon_add * gps_timer_modifier;
+            calculated_lat_error += (lat_add + lat_modifier_add) * gps_timer_modifier;
+            calculated_lon_error += (lon_add + lon_modifier_add) * gps_timer_modifier;
         }
 
         latitude_error_over_time_total -= latitude_error_over_time[gps_error_over_time_reading_index];
@@ -282,23 +294,29 @@ void GPSPID()
         longitude_error_over_time[gps_error_over_time_reading_index] = (calculated_lon_error - last_calculated_lon_error) * kd_gps * gps_timer_modifier;
         longitude_error_over_time_total += longitude_error_over_time[gps_error_over_time_reading_index];
 
+        last_calculated_lat_error = calculated_lat_error;
+        last_calculated_lon_error = calculated_lon_error;
+
         gps_error_over_time_reading_index++;
 
-        if (gps_error_over_time_reading_index == 35)
+        if (gps_error_over_time_reading_index == 30)
             gps_error_over_time_reading_index = 0;
 
         pid_error_temp = calculated_lon_error;
 
-        gps_roll_modifier = ((pid_error_temp * kp_gps * gps_timer_modifier) + longitude_error_over_time_total);
+        gps_roll_modifier_north = ((pid_error_temp * kp_gps_actual * gps_timer_modifier) + longitude_error_over_time_total);
+
+        pid_error_temp = calculated_lat_error;
+
+        gps_pitch_modifier_north = ((pid_error_temp * kp_gps_actual * gps_timer_modifier) + latitude_error_over_time_total);
+
+        gps_roll_modifier = (int32_t)(((float)gps_roll_modifier_north * cos(yaw_angle * 0.017453)) + ((float)gps_pitch_modifier_north * sin(yaw_angle * 0.017453)));
+        gps_pitch_modifier = (int32_t)(((float)gps_pitch_modifier_north * cos(yaw_angle * 0.017453)) + ((float)gps_roll_modifier_north * sin(yaw_angle * -0.017453)));
 
         if (gps_roll_modifier > 300)
             gps_roll_modifier = 300;
         else if (gps_roll_modifier < -300)
             gps_roll_modifier = -300;
-
-        pid_error_temp = calculated_lat_error;
-
-        gps_pitch_modifier = ((pid_error_temp * kp_gps * gps_timer_modifier) + latitude_error_over_time_total);
 
         if (gps_pitch_modifier > 300)
             gps_pitch_modifier = 300;
@@ -321,6 +339,12 @@ void ResetGPSVariables()
 
     latitude_error_over_time_total = 0;
     longitude_error_over_time_total = 0;
+
+    last_calculated_lat_error = 0;
+    last_calculated_lon_error = 0;
+
+    gps_roll_modifier_north = 0;
+    gps_pitch_modifier_north = 0;
 
     gps_roll_modifier = 0;
     gps_pitch_modifier = 0;

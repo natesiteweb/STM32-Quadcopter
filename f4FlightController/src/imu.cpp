@@ -1,6 +1,7 @@
 #include "Arduino.h"
 #include "Wire.h"
 #include "imu.h"
+#include "compass.h"
 
 int16_t raw_gyro_x = 0, raw_gyro_y = 0, raw_gyro_z = 0;
 float gyro_x_val, gyro_y_val, gyro_z_val;
@@ -92,4 +93,8 @@ void CalibrateIMU()
   gyro_x_calibration /= 2000;
   gyro_y_calibration /= 2000;
   gyro_z_calibration /= 2000;
+
+  ReadCompass();
+
+  total_gyro_z_angle = compass_heading;
 }

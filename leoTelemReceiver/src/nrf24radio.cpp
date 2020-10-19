@@ -116,7 +116,12 @@ void NRF_Set_Ack_Payload()
     {
         for (int i = 1; i < ack_payload_buf_counter; i++)
         {
-            ack_payload_buf[i] = ack_payload_buf[i + 1];
+            ack_payload_buf[i].width = ack_payload_buf[i + 1].width;
+
+            for(int j = 0; j < ack_payload_buf[i].width; j++)
+            {
+                ack_payload_buf[i].payload[j] = ack_payload_buf[i + 1].payload[j];
+            }
         }
 
         ack_payload_buf_counter--;

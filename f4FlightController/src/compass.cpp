@@ -65,7 +65,7 @@ void ReadCompass()
 
     compassX += compass_offset_x;
 
-    comX = ((float)compassX * cos((pitch_angle - 3.00) * 0.0174533)) + ((float)compassY * sin((roll_angle + 2.00) * 0.0174533) * sin((pitch_angle - 3.00) * 0.0174533)) - ((float)compassZ * cos((roll_angle + 2.00) * 0.0174533) * sin((pitch_angle - 3.00) * 0.0174533));
+    comX = ((float)compassX * cos((pitch_angle + 3.00) * 0.0174533)) + ((float)compassY * sin((roll_angle + 2.00) * 0.0174533) * sin((pitch_angle + 3.00) * 0.0174533)) - ((float)compassZ * cos((roll_angle + 2.00) * 0.0174533) * sin((pitch_angle + 3.00) * 0.0174533));
 
     comY = ((float)compassY * cos((roll_angle + 2.00) * 0.0174533)) + ((float)compassZ * sin((roll_angle + 2.00) * 0.0174533));
 
@@ -75,6 +75,8 @@ void ReadCompass()
         compass_heading = atan2((float)comY, (float)comX) * 57.29577;
 
     compass_heading = -compass_heading;
+
+    compass_heading -= 5;
 
     if (compass_heading < 0)
         compass_heading += 360;
@@ -93,7 +95,7 @@ void CalibrateCompass()
 
     calibrate_compass_timer = millis();
 
-    while (millis() - calibrate_compass_timer < 15000)
+    while (millis() - calibrate_compass_timer < 8000)
     {
         Wire.beginTransmission(COMPASS_ADDRESS);
         Wire.write(0x03);

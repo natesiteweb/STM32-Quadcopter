@@ -13,15 +13,12 @@ uint8_t Set_to_57kbps[28] = {0xB5, 0x62, 0x06, 0x00, 0x14, 0x00, 0x01, 0x00, 0x0
 
 uint8_t new_line = 0;
 uint8_t message_counter = 0;
-uint8_t nmea_message[100];
+uint8_t nmea_message[110];
 
 int32_t latitude = 1, longitude = 1;
 uint8_t sat_count = 0;
 bool gps_fix = false;
 uint8_t new_gps_data = 0;
-
-uint8_t is_calibrating = 0;
-uint32_t is_calibrating_timer;
 
 int32_union int32_u;
 uint32_union uint32_u;
@@ -41,7 +38,7 @@ void Setup_GPS()
 
 void Read_GPS()
 {
-    while (Serial2.available() > 0 && new_line == 0)
+    if (Serial2.available() > 0 && new_line == 0)
     {
         char c = Serial2.read();
 
@@ -118,7 +115,7 @@ void Read_GPS()
             sat_count = (uint8_t)((int)nmea_message[45] - 48) * (uint8_t)10;
             sat_count += (uint8_t)((int)nmea_message[46] - 48);
 
-            if (is_calibrating == 0)
+            if (is_calibrating == 0 && wire_packet_buf_counter < 30)
             {
 
                 wire_packet_buf[wire_packet_buf_counter].payload[0] = 0x08; //GPS_PACKET
@@ -152,6 +149,7 @@ void Read_GPS()
                 }
 
                 wire_packet_buf[wire_packet_buf_counter].width = 14;
+
                 wire_packet_buf_counter++;
             }
 

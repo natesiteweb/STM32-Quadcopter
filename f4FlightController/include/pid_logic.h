@@ -8,7 +8,7 @@ void AltitudePID(void);
 void GPSPID(void);
 void ResetGPSVariables(void);
 
-extern uint8_t flight_mode;
+extern uint8_t flight_mode, flight_mode_update, flight_mode_update_telem;
 
 extern uint32_t gyro_pid_timer;
 
@@ -37,7 +37,8 @@ extern int32_t esc1_output, esc2_output, esc3_output, esc4_output;
 
 extern float kp_gps, kp_gps_actual;
 extern float ki_gps;
-extern float kd_gps;
+extern float kd_gps, kd_gps_actual;
+extern float kd2_gps;
 
 extern float pid_gps_roll_i, pid_gps_pitch_i;
 extern float calculated_lat_error, calculated_lon_error;
@@ -55,6 +56,8 @@ extern uint8_t gps_error_over_time_reading_index;
 
 extern int32_t latitude_table[40];
 extern int32_t longitude_table[40];
+
+extern uint8_t waypoint_count;
 
 extern int32_t lat_setpoint;
 extern int32_t lon_setpoint;
@@ -74,5 +77,10 @@ extern float lat_modifier_add;
 extern float lon_modifier_add;
 
 extern float battery_voltage;
+
+extern float altitude_table[40];
+extern uint8_t auto_pilot_command_table[80];
+extern uint32_t delay_command_timer;
+extern uint8_t is_auto_pilot;
 
 #endif

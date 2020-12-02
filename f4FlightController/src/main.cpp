@@ -32,15 +32,20 @@ float angle_calculation_bias = 0.9985;
  * 2: Manual; autolevel
  * 3: Manual; autolevel; altitude hold
  * 4: Manual; autolevel; altitude hold; GPS hold
+ * 5: Manual; autolevel; TAKEOFF
  **/
-uint8_t flight_mode = 1;
+uint8_t flight_mode = 1, flight_mode_update = 1, flight_mode_update_telem = 1;
 
 float battery_voltage = 0;
 
 uint8_t gps_interpolate_counter = 0;
+uint8_t gps_interpolate_speed = 12; //Initital value doesn't matter much
 
-float acc_x_offset = 0;
+float acc_x_offset = 0.5;
 float acc_y_offset = -2.6;
+
+uint32_t debug_led_timer;
+byte temp_led_state1 = 0;
 
 void setup()
 {
@@ -95,6 +100,7 @@ void setup()
   kp_gps = EEPROM_Float_Read((uint16_t)12);
   ki_gps = EEPROM_Float_Read((uint16_t)16);
   kd_gps = EEPROM_Float_Read((uint16_t)20);
+  kd2_gps = EEPROM_Float_Read((uint16_t)24);
 
   EEPROM_Clear_Buf();
   EEPROM_Load_Page(64);
@@ -110,6 +116,7 @@ void setup()
   kd_pitch = kd_roll;
 
   kp_gps_actual = kp_gps;
+  kd_gps_actual = kd_gps;
 
   delay(250);
 
@@ -118,12 +125,17 @@ void setup()
   delay(250);
 
   gyro_pid_timer = micros();
-
-  analogReadResolution(12);
 }
 
 void loop()
 {
+  if (millis() - debug_led_timer > 200)
+  {
+    debug_led_timer = millis();
+    temp_led_state1 = (~temp_led_state1) & 0x01;
+    digitalWrite(PC2, temp_led_state1);
+  }
+
   if (micros() - loop_timer >= 4000) //Main loop
   {
     time_since_last_main_loop = micros() - loop_timer;
@@ -173,26 +185,26 @@ void loop()
 
     CalculateHeadingDifference(total_gyro_z_angle, compass_heading);
 
-    if (heading_difference_return > 10 || heading_difference_return < -10)
+    if (heading_difference_return > 5 || heading_difference_return < -5)
       total_gyro_z_angle = compass_heading;
 
     yaw_angle = total_gyro_z_angle;
 
     if (pid_altitude_setpoint < bmp_setpoint - 0.05 && flight_mode >= 3)
-      pid_altitude_setpoint += 0.00175;
+      pid_altitude_setpoint += 0.00250; //0.00185
     else if (pid_altitude_setpoint > bmp_setpoint + 0.05 && flight_mode >= 3)
-      pid_altitude_setpoint -= 0.00175;
+      pid_altitude_setpoint -= 0.00250;
 
-    if (flight_mode >= 4)
+    if (flight_mode >= 4 && flight_mode != 5)
     {
-      if (gps_interpolate_counter == 20)
+      gps_interpolate_counter++;
+
+      if (gps_interpolate_counter == gps_interpolate_speed)
       {
         gps_interpolate_counter = 0;
 
         InterpolateGPSCoords();
       }
-
-      gps_interpolate_counter++;
     }
 
     ParseControllerInput();
@@ -220,7 +232,7 @@ void loop()
       ReadCompass();
     }
 
-    if (flight_mode >= 4)
+    if (flight_mode >= 4 && flight_mode != 5)
     {
       GPSPID();
     }
@@ -274,6 +286,8 @@ void ParseControllerInput()
     if (flight_mode < 4) //GPS hold
     {
       flight_mode = 4;
+      pid_altitude_setpoint = bmp_altitude + 1.00;
+      bmp_setpoint = bmp_altitude + 1.00;
       captured_throttle = frequencyRead3;
       ResetTimers();
 
@@ -289,16 +303,13 @@ void ParseControllerInput()
       latitude_table[4] = latitude_table[1];
       longitude_table[4] = longitude_table[1];
 
-      last_lat_interp = latitude_table[1];
-      last_lon_interp = longitude_table[1];
-
       lat_modifier_add = 0;
       lon_modifier_add = 0;
 
       lat_modifier = 0;
       lon_modifier = 0;
 
-      SendGPSPacket((uint8_t)1); //Send home position
+      SendGPSPacket((uint8_t)1, (uint8_t)1); //Send home position
     }
     /*else if(sat_count < 3)
     {
@@ -321,6 +332,9 @@ void ResetTimers()
 
 int32_t lat_interp_difference = 0;
 int32_t lon_interp_difference = 0;
+
+float difference_magnitude = 0;
+
 float lat_modifier = 0;
 float lon_modifier = 0;
 
@@ -330,14 +344,41 @@ float lon_modifier_add = 0;
 int32_t last_lat_interp = 0;
 int32_t last_lon_interp = 0;
 
+int32_t last_lat = 0;
+int32_t last_lon = 0;
+
 void InterpolateGPSCoords()
 {
   lat_interp_difference = latitude_table[3] - latitude_table[4];
   lon_interp_difference = longitude_table[3] - longitude_table[4];
 
-  kp_gps_actual = kp_gps;
+  //difference_magnitude = sqrt(((float)lat_interp_difference * (float)lat_interp_difference) + ((float)lon_interp_difference * (float)lon_interp_difference));
 
-  if (abs(latitude_table[2] - latitude_table[3]) < 2 || abs(longitude_table[2] - longitude_table[3]) < 2)
+  kp_gps_actual = kp_gps;
+  kd_gps_actual = kd_gps;
+
+  last_lat = latitude_table[2];
+  last_lon = longitude_table[2];
+
+  /*if (latitude_table[2] < latitude_table[3])
+  {
+    latitude_table[2] += 1;
+  }
+  else if (latitude_table[2] > latitude_table[3])
+  {
+    latitude_table[2] -= 1;
+  }
+
+  if (longitude_table[2] < longitude_table[3])
+  {
+    longitude_table[2] += 1;
+  }
+  else if (longitude_table[2] > longitude_table[3])
+  {
+    longitude_table[2] -= 1;
+  }
+
+  if (latitude_table[2] == latitude_table[3] && longitude_table[2] == longitude_table[3])
   {
     latitude_table[2] = latitude_table[3];
     longitude_table[2] = longitude_table[3];
@@ -347,23 +388,69 @@ void InterpolateGPSCoords()
 
     if (lat_modifier != 0 && lon_modifier != 0)
     {
-      //SendGPSPacket((uint8_t)2);
+      SendGPSPacket((uint8_t)2);
     }
+
+    last_lat_interp = latitude_table[2];
+    last_lon_interp = longitude_table[2];
 
     lat_modifier_add = 0;
     lon_modifier_add = 0;
 
     lat_modifier = 0;
     lon_modifier = 0;
+
+    //last_lat = latitude_table[2];
+    //last_lon = longitude_table[2];
+
+    gps_interpolate_speed = 14;
   }
   else
   {
-    kp_gps_actual = kp_gps * 0.75;
+    gps_interpolate_speed = 14;
 
-    last_lat_interp = latitude_table[2];
-    last_lon_interp = longitude_table[2];
+    kp_gps_actual = kp_gps;
+    kd_gps_actual = kd2_gps;
 
-    if (abs(lat_interp_difference) > abs(lon_interp_difference))
+    SendGPSPacket((uint8_t)2);
+  }*/
+
+  //kp_gps_actual = (kp_gps_actual * 0.89) + ((kp_gps)*0.11);
+  //kd_gps_actual = (kd_gps_actual * 0.89) + ((kd_gps)*0.11);
+
+  //kp_gps_actual = (kp_gps * 0.40);
+  //kd_gps_actual = (kd_gps * 0.85);
+
+  //last_lat_interp = latitude_table[2];
+  //last_lon_interp = longitude_table[2];
+
+  gps_interpolate_speed = 12;
+
+  if (abs(lat_interp_difference) >= abs(lon_interp_difference))
+  {
+    if (latitude_table[2] == latitude_table[3])
+    {
+      latitude_table[2] = latitude_table[3];
+      longitude_table[2] = longitude_table[3];
+
+      latitude_table[4] = latitude_table[3];
+      longitude_table[4] = longitude_table[3];
+
+      if (lat_modifier != 0 && lon_modifier != 0)
+      {
+        SendGPSPacket((uint8_t)2, (uint8_t)1);
+      }
+
+      last_lat_interp = latitude_table[2];
+      last_lon_interp = longitude_table[2];
+
+      lat_modifier_add = 0;
+      lon_modifier_add = 0;
+
+      lat_modifier = 0;
+      lon_modifier = 0;
+    }
+    else
     {
       if (latitude_table[2] < latitude_table[3])
         lat_modifier += 1;
@@ -372,10 +459,37 @@ void InterpolateGPSCoords()
 
       lon_modifier = (((float)lon_interp_difference / (float)lat_interp_difference) * lat_modifier);
 
-      latitude_table[2] = latitude_table[4] + lat_modifier;
-      longitude_table[2] = longitude_table[4] + lon_modifier;
+      latitude_table[2] = latitude_table[4] + (int32_t)lat_modifier;
+      longitude_table[2] = longitude_table[4] + (int32_t)lon_modifier;
+
+      SendGPSPacket((uint8_t)2, (uint8_t)1);
     }
-    else if (abs(lat_interp_difference) < abs(lon_interp_difference))
+  }
+  else if (abs(lat_interp_difference) < abs(lon_interp_difference))
+  {
+    if (longitude_table[2] == longitude_table[3])
+    {
+      latitude_table[2] = latitude_table[3];
+      longitude_table[2] = longitude_table[3];
+
+      latitude_table[4] = latitude_table[3];
+      longitude_table[4] = longitude_table[3];
+
+      if (lat_modifier != 0 && lon_modifier != 0)
+      {
+        SendGPSPacket((uint8_t)2, (uint8_t)1);
+      }
+
+      last_lat_interp = latitude_table[2];
+      last_lon_interp = longitude_table[2];
+
+      lat_modifier_add = 0;
+      lon_modifier_add = 0;
+
+      lat_modifier = 0;
+      lon_modifier = 0;
+    }
+    else
     {
       if (longitude_table[2] < longitude_table[3])
         lon_modifier += 1;
@@ -384,25 +498,15 @@ void InterpolateGPSCoords()
 
       lat_modifier = (((float)lat_interp_difference / (float)lon_interp_difference) * lon_modifier);
 
-      latitude_table[2] = latitude_table[4] + lat_modifier;
-      longitude_table[2] = longitude_table[4] + lon_modifier;
+      latitude_table[2] = latitude_table[4] + (int32_t)lat_modifier;
+      longitude_table[2] = longitude_table[4] + (int32_t)lon_modifier;
+
+      SendGPSPacket((uint8_t)2, (uint8_t)1);
     }
-    else if (abs(lat_interp_difference) == abs(lon_interp_difference))
-    {
-      if (latitude_table[2] < latitude_table[3])
-        lat_modifier += 1;
-      else
-        lat_modifier -= 1;
-
-      lon_modifier = (((float)lon_interp_difference / (float)lat_interp_difference) * lat_modifier);
-
-      latitude_table[2] = latitude_table[4] + lat_modifier;
-      longitude_table[2] = longitude_table[4] + lon_modifier;
-    }
-
-    lat_modifier_add = (float)(last_lat_interp - latitude_table[2]) / (float)4.2;
-    lon_modifier_add = (float)(longitude_table[2] - last_lon_interp) / (float)4.2;
-
-    //SendGPSPacket((uint8_t)2);
   }
+
+  //lat_modifier_add = (float)(latitude_table[2] - last_lat_interp) / (float)4.0;
+  //lon_modifier_add = (float)(longitude_table[2] - last_lon_interp) / (float)4.0;
+
+  //SendGPSPacket((uint8_t)2);
 }

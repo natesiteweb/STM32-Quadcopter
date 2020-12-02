@@ -2,6 +2,7 @@
 #include "Wire.h"
 #include "imu.h"
 #include "compass.h"
+#include "pid_logic.h"
 
 int16_t raw_gyro_x = 0, raw_gyro_y = 0, raw_gyro_z = 0;
 float gyro_x_val, gyro_y_val, gyro_z_val;
@@ -13,6 +14,12 @@ int16_t imu_temp;
 int16_t raw_acc_x, raw_acc_y, raw_acc_z;
 float acc_x_val, acc_y_val, acc_z_val;
 float acc_magnitude;
+
+float z_acc_fast[30], z_acc_slow[50], z_acc_fast_total, z_acc_slow_total;
+int z_acc_fast_reading_index = 0, z_acc_slow_reading_index = 0;
+float acc_magnitude_at_start;
+
+uint32_t takeoff_timer;
 
 void SetupIMU()
 {
@@ -97,4 +104,12 @@ void CalibrateIMU()
   ReadCompass();
 
   total_gyro_z_angle = compass_heading;
+}
+
+void AccTakeoff()
+{
+  if(millis() - takeoff_timer >= 1000)
+  {
+    captured_throttle += 1;
+  }
 }

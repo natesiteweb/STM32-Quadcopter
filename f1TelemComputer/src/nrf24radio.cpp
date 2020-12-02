@@ -7,32 +7,12 @@
 
 SPIClass rfspi(MOSI_pin, MISO_pin, SCK_pin);
 
-byte data_in[34];
-
-/**
-* Packets to be updated automatically
-* 0: Gyro 
-*/
-data_packet_pointer auto_packet_buf[32];
-uint8_t auto_packet_buf_counter = 0;
-
-data_packet packet_buf[32];     //Packet buffer FIFO from F4 master
-uint8_t packet_buf_counter = 0; //Amount of packets in buffer ^
-
-data_packet wire_packet_buf[32];     //Packet buffer from THIS to F4 or ground control to F4
-uint8_t wire_packet_buf_counter = 0; //Amount of packets in buffer ^
-
-int sent_packet_counter = 0;
-int ack_packet_counter = 0;
-
-uint8_t ack_width = 0;
-uint8_t ack_payload_test = 0;
-
-uint32_t pps_timer = 0;
+byte data_in[36];
 
 uint32_t packet_lag_timer;
 uint32_t min_packet_lag = 2500;
 
+uint8_t auto_packet_buf_counter = 0;
 uint8_t packet_width = 0;
 
 void NRF_Init()
@@ -172,6 +152,8 @@ void radio_loop()
                 digitalWrite(CSN_pin, LOW);
                 data_in[0] = rfspi.transfer(B01100000); //get packet width
                 packet_width = rfspi.transfer(B00000000);
+                if(packet_width > 32)
+                    packet_width = 32;
                 digitalWrite(CSN_pin, HIGH);
 
                 //delayMicroseconds(100);
@@ -192,13 +174,15 @@ void radio_loop()
 
                         if(received_data[0] == 0xF7)
                         {
+                            digitalWrite(PA7, HIGH);
                             is_calibrating = 1;
                             is_calibrating_timer = millis();
                         }
                         else if(received_data[0] == 0xFA)
                         {
+                            digitalWrite(PA7, HIGH);
                             is_calibrating = 1;
-                            is_calibrating_timer = millis() + 6000;
+                            is_calibrating_timer = millis();
                         }
                     }
 

@@ -18,6 +18,12 @@ extern int16_t raw_acc_x, raw_acc_y, raw_acc_z;
 extern float acc_x_val, acc_y_val, acc_z_val;
 extern float acc_magnitude;
 
+extern float z_acc_fast[30], z_acc_slow[50], z_acc_fast_total, z_acc_slow_total;
+extern int z_acc_fast_reading_index, z_acc_slow_reading_index;
+extern float acc_magnitude_at_start;
+
+extern uint32_t takeoff_timer;
+
 void SetupIMU(void);
 void CalibrateIMU(void);
 void ReadIMU(bool calibrating);

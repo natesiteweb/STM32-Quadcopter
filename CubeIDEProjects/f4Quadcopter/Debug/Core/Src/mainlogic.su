@@ -1,0 +1,2 @@
+mainlogic.c:30:6:main_setup	16	static
+mainlogic.c:65:6:main_loop	16	static

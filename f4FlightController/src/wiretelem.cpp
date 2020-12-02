@@ -21,7 +21,7 @@ uint8_t manual_packet_index = 0;
 
 uint8_t auto_packet_count = 0; //How many automatic packets there are
 
-uint8_t telem_rate = 2;       //Every program loop (2 means every other program loop)
+uint8_t telem_rate = 4;       //Every program loop (2 means every other program loop)
 uint8_t telem_read_rate = 10; //This * telem_rate is actual read rate (40ms)
 
 uint8_t telem_rate_counter = 0;
@@ -39,7 +39,8 @@ void telem_wire_setup()
 }
 
 uint8_t temp_led_state = 0;
-uint8_t gps_read_index;
+uint8_t gps_read_index, temp_waypoint_total_count;
+uint8_t received_waypoint_count = 0;
 
 void telem_loop()
 {
@@ -68,7 +69,7 @@ void telem_loop()
                 break;
             case 0xF7:
                 temp_led_state = (~temp_led_state) & 0x01;
-                digitalWrite(PC2, temp_led_state);
+                //digitalWrite(PC2, temp_led_state);
                 flight_mode = 1;
 
                 //TelemPrintDebug((char *)"Calibrated.\n", 12);
@@ -87,7 +88,9 @@ void telem_loop()
                 PopulateManualPacket(ki_yaw);
                 PopulateManualPacket(kd_yaw);
                 packet_buf[packet_buf_counter].width = manual_packet_index + 1;
-                packet_buf_counter++;
+
+                if (packet_buf_counter < 30)
+                    packet_buf_counter++;
                 break;
             case PID_GAIN_FIRST_UPDATE_REQUEST:
                 manual_packet_index = 1;
@@ -120,7 +123,9 @@ void telem_loop()
                 PopulateManualPacket(ki_yaw);
                 PopulateManualPacket(kd_yaw);
                 packet_buf[packet_buf_counter].width = manual_packet_index + 1;
-                packet_buf_counter++;
+
+                if (packet_buf_counter < 30)
+                    packet_buf_counter++;
                 break;
             case PID_GAIN_SECOND_REQUEST:
                 packet_buf[packet_buf_counter].id = PID_GAIN_SECOND_PACKET;
@@ -129,10 +134,12 @@ void telem_loop()
                 PopulateManualPacket(ki_altitude);
                 PopulateManualPacket(kd_altitude);
                 PopulateManualPacket(kp_gps);
-                PopulateManualPacket(ki_gps);
+                PopulateManualPacket(kd2_gps);
                 PopulateManualPacket(kd_gps);
                 packet_buf[packet_buf_counter].width = manual_packet_index + 1;
-                packet_buf_counter++;
+
+                if (packet_buf_counter < 30)
+                    packet_buf_counter++;
                 break;
             case PID_GAIN_SECOND_UPDATE_REQUEST:
                 manual_packet_index = 1;
@@ -140,8 +147,9 @@ void telem_loop()
                 ki_altitude = ReadManualPacket_Float();
                 kd_altitude = ReadManualPacket_Float();
                 kp_gps = ReadManualPacket_Float();
-                ki_gps = ReadManualPacket_Float();
+                //ki_gps = ReadManualPacket_Float();
                 kd_gps = ReadManualPacket_Float();
+                kd2_gps = ReadManualPacket_Float();
 
                 EEPROM_Clear_Buf();
                 EEPROM_Float_Write(0, kp_altitude);
@@ -150,6 +158,7 @@ void telem_loop()
                 EEPROM_Float_Write(12, kp_gps);
                 EEPROM_Float_Write(16, ki_gps);
                 EEPROM_Float_Write(20, kd_gps);
+                EEPROM_Float_Write(24, kd2_gps);
                 EEPROM_Save_Page(32);
 
                 packet_buf[packet_buf_counter].id = PID_GAIN_SECOND_PACKET;
@@ -158,10 +167,12 @@ void telem_loop()
                 PopulateManualPacket(ki_altitude);
                 PopulateManualPacket(kd_altitude);
                 PopulateManualPacket(kp_gps);
-                PopulateManualPacket(ki_gps);
+                PopulateManualPacket(kd2_gps);
                 PopulateManualPacket(kd_gps);
                 packet_buf[packet_buf_counter].width = manual_packet_index + 1;
-                packet_buf_counter++;
+
+                if (packet_buf_counter < 30)
+                    packet_buf_counter++;
                 break;
             case CALIBRATE_ESC_REQUEST:
                 EEPROM_Single_Byte_Write(0x8000, 0x01);
@@ -172,7 +183,9 @@ void telem_loop()
                 manual_packet_index = 0;
                 PopulateManualPacket(bmp_setpoint);
                 packet_buf[packet_buf_counter].width = manual_packet_index + 1;
-                packet_buf_counter++;
+
+                if (packet_buf_counter < 30)
+                    packet_buf_counter++;
                 break;
             case ALTITUDE_SET_REQUEST: //If you upload altitude setpoint
                 manual_packet_index = 1;
@@ -182,7 +195,9 @@ void telem_loop()
                 manual_packet_index = 0;
                 PopulateManualPacket(bmp_setpoint);
                 packet_buf[packet_buf_counter].width = manual_packet_index + 1;
-                packet_buf_counter++;
+
+                if (packet_buf_counter < 30)
+                    packet_buf_counter++;
                 break;
             case GPS_PACKET:
                 manual_packet_index = 1;
@@ -197,7 +212,7 @@ void telem_loop()
                 latitude_table[0] = raw_latitude;
                 longitude_table[0] = raw_longitude;
 
-                if (flight_mode < 4)
+                if (flight_mode < 4 || flight_mode == 5)
                 {
                     latitude_table[2] = raw_latitude;
                     longitude_table[2] = raw_longitude;
@@ -215,7 +230,8 @@ void telem_loop()
                 last_raw_latitude = raw_latitude;
                 last_raw_longitude = raw_longitude;
 
-                SendGPSPacket((uint8_t)0);
+                if (packet_buf_counter < 30)
+                    SendGPSPacket((uint8_t)0, (uint8_t)1);
                 break;
             case CALIBRATE_COMPASS_REQUEST:
                 flight_mode = 1;
@@ -226,32 +242,72 @@ void telem_loop()
                 ResetTimers();
                 break;
             case GPS_PACKET_UPDATE_REQUEST:
-                manual_packet_index = 1;
-                gps_read_index = wire_receive_data[manual_packet_index];
-                manual_packet_index++;
-
-                if (gps_read_index > 4)
+                if (1 == 0)
                 {
-                    latitude_table[gps_read_index] = ReadManualPacket_Int32();
-                    longitude_table[gps_read_index] = ReadManualPacket_Int32();
+                    manual_packet_index = 1;
+                    temp_waypoint_total_count = wire_receive_data[manual_packet_index];
+                    manual_packet_index++;
+                    received_waypoint_count = wire_receive_data[manual_packet_index];
+                    manual_packet_index++;
+
+                    if (temp_waypoint_total_count > 1)
+                        waypoint_count = temp_waypoint_total_count;
+
+                    if (received_waypoint_count > 3)
+                        received_waypoint_count = 3;
+
+                    for (int i = 0; i < received_waypoint_count; i++)
+                    {
+                        gps_read_index = wire_receive_data[manual_packet_index];
+                        manual_packet_index++;
+
+                        if (gps_read_index > 4)
+                        {
+                            latitude_table[gps_read_index] = ReadManualPacket_Int32();
+                            longitude_table[gps_read_index] = ReadManualPacket_Int32();
+
+                            //SendGPSPacket((uint8_t)gps_read_index);
+                        }
+                    }
                 }
 
                 break;
-            case GPS_PACKET_REQUEST: //Request hold position
-                SendGPSPacket((uint8_t)5);
+            case GPS_PACKET_REQUEST: //Request GPS coord table
+                if (packet_buf_counter < 30 && 1 == 0)
+                {
+                    SendGPSPacket((uint8_t)5, (uint8_t)(1));
+
+                    for (int i = 0; i < waypoint_count; i++)
+                    {
+                        if ((i + 3) % 3 == 0)
+                        {
+                            SendGPSPacket((uint8_t)(i + 6), (uint8_t)((waypoint_count - i) + 1));
+                        }
+                        else
+                        {
+                            SendGPSPacketBatch((uint8_t)(i + 6));
+                        }
+                    }
+                }
+
                 break;
             case GPS_HOLD_COPY_BUFFER_REQUEST: //Copy hold position buffer
+                latitude_table[4] = latitude_table[0];
+                longitude_table[4] = longitude_table[0];
+
                 latitude_table[3] = latitude_table[5];
                 longitude_table[3] = longitude_table[5];
-
-                latitude_table[4] = latitude_table[2];
-                longitude_table[4] = longitude_table[2];
 
                 lat_modifier_add = 0;
                 lon_modifier_add = 0;
 
                 lat_modifier = 0;
                 lon_modifier = 0;
+                break;
+            case AUTO_PILOT_PACKET:
+                is_auto_pilot = 1;
+                break;
+            case FLIGHT_MODE_UPDATE_REQUEST: //Also used for commands
                 break;
             }
         }
@@ -315,19 +371,34 @@ void TelemPrintDebug(char txt_to_print[30], uint8_t message_length)
     }
 
     packet_buf[packet_buf_counter].width = manual_packet_index + 1;
-    packet_buf_counter++;
+
+    if (packet_buf_counter < 30)
+        packet_buf_counter++;
 }
 
-void SendGPSPacket(uint8_t gps_index)
+void SendGPSPacket(uint8_t gps_index, uint8_t batch_count) //CAN SEND MAX BATCH OF 3 COORDS
 {
     packet_buf[packet_buf_counter].id = GPS_PACKET;
     manual_packet_index = 0;
-    PopulateManualPacket((uint8_t)gps_index);
     PopulateManualPacket((uint8_t)sat_count);
+    PopulateManualPacket((uint8_t)batch_count);
+    //Sent with each coord
+    PopulateManualPacket((uint8_t)gps_index);
     PopulateManualPacket((int32_t)latitude_table[gps_index]);
     PopulateManualPacket((int32_t)longitude_table[gps_index]);
     packet_buf[packet_buf_counter].width = manual_packet_index + 1;
-    packet_buf_counter++;
+
+    if (packet_buf_counter < 30)
+        packet_buf_counter++;
+}
+
+void SendGPSPacketBatch(uint8_t gps_index)
+{
+    PopulateManualPacket((uint8_t)gps_index);
+    PopulateManualPacket((int32_t)latitude_table[gps_index]);
+    PopulateManualPacket((int32_t)longitude_table[gps_index]);
+    packet_buf[packet_buf_counter].width = manual_packet_index + 1;
+    //packet_buf_counter++;
 }
 
 void PopulatePacketBuf(uint8_t **buf, float *num, int start_index)

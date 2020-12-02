@@ -7,7 +7,8 @@
 void telem_loop(void);
 void telem_wire_setup(void);
 
-void SendGPSPacket(uint8_t gps_index);
+void SendGPSPacket(uint8_t gps_index, uint8_t batch_count);
+void SendGPSPacketBatch(uint8_t gps_index);
 
 void PopulatePacketBuf(uint8_t **buf, float *num, int start_index);
 void PopulatePacketBuf(uint8_t **buf, uint32_t *num, int start_index);
@@ -57,6 +58,7 @@ enum
     PID_GAIN_SECOND_PACKET = 0x04,
     GPS_PACKET = 0x08,
     PRINT_PACKET = 0x09,
+    AUTO_PILOT_PACKET = 0xA0,
 
     PID_GAIN_FIRST_REQUEST = 0xF3,
     PID_GAIN_SECOND_REQUEST = 0xF4,
@@ -68,7 +70,8 @@ enum
     CALIBRATE_ESC_REQUEST = 0xFB,
     GPS_PACKET_UPDATE_REQUEST = 0xFD,
     GPS_PACKET_REQUEST = 0xFE,
-    GPS_HOLD_COPY_BUFFER_REQUEST = 0xE0
+    GPS_HOLD_COPY_BUFFER_REQUEST = 0xE0,
+    FLIGHT_MODE_UPDATE_REQUEST = 0xFC,
 };
 
 typedef union 

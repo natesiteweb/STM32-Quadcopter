@@ -51,9 +51,9 @@
 
 /* USER CODE BEGIN PV */
 
-uint8_t receive_flag = 0;
+volatile uint8_t receive_flag = 0;
 
-uint8_t receieve_buffer[4];
+volatile uint8_t receieve_buffer[4];
 
 uint8_t buf[20];
 
@@ -108,7 +108,8 @@ int main(void)
 
   HAL_Delay(5000);
 
-  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)receieve_buffer, (uint16_t)2);
+
+  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)receieve_buffer, 2);
 
   /*HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
 
@@ -126,6 +127,7 @@ int main(void)
   HAL_I2C_Slave_Seq_Receive_IT(hi2c, pData, Size, XferOptions);
   HAL_I2C_Slave_Receive_IT(hi2c, pData, Size);
   HAL_I2C_*/
+  //HAL_I2C_
 
   /* USER CODE END 2 */
 
@@ -147,7 +149,7 @@ int main(void)
 		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
 
 		  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)receieve_buffer, 2);
-		  HAL_Delay(10);
+		  //HAL_Delay(10);
 	  }
 
     /* USER CODE END WHILE */

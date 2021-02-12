@@ -11,6 +11,9 @@
 		{
 			"name": "leoTelemReceiver",
 			"path": "leoTelemReceiver"
+		},
+		{
+			"path": "leoTelemReceiver2"
 		}
 	],
 	"settings": {

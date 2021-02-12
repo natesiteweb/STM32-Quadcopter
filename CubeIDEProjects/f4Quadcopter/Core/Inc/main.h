@@ -49,6 +49,14 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
 
+extern volatile uint8_t ack_rate_counter;
+extern uint8_t ack_rate;
+
+extern uint8_t read_flag;
+
+extern uint8_t send_buffer[35];
+extern uint8_t receive_buffer[35];
+
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
@@ -62,6 +70,10 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define LED1_Pin GPIO_PIN_1
+#define LED1_GPIO_Port GPIOC
+#define LED2_Pin GPIO_PIN_2
+#define LED2_GPIO_Port GPIOC
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

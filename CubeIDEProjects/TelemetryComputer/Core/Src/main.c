@@ -20,13 +20,18 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "dma.h"
 #include "i2c.h"
 #include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
+#include "string.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+#include "nrf24radio.h"
 
 /* USER CODE END Includes */
 
@@ -51,11 +56,20 @@
 
 /* USER CODE BEGIN PV */
 
-volatile uint8_t receive_flag = 0;
+NRF24_RADIO nrf_radio;
 
-volatile uint8_t receieve_buffer[4];
+volatile uint8_t i2c_receive_flag = 0;
+volatile uint8_t new_packet_to_send_available = 0;
+volatile uint8_t receieve_buffer[32];
+
+data_packet empty_data_packet;
+
+volatile uint32_t micros_timer_base;
+
+uint32_t time_since_last_radio_send = 0;
 
 uint8_t buf[20];
+
 
 /* USER CODE END PV */
 
@@ -98,36 +112,44 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_ADC1_Init();
   MX_I2C1_Init();
   MX_SPI2_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_Delay(5000);
+  nrf_radio.spiHandle = &hspi2;
+  nrf_radio.csnPinPort = NRF_CSN_GPIO_Port;
+  nrf_radio.cePinPort = NRF_CE_GPIO_Port;
+  nrf_radio.csnPin = NRF_CSN_Pin;
+  nrf_radio.cePin = NRF_CE_Pin;
 
+  HAL_Delay(500);
 
-  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)receieve_buffer, 2);
+  HAL_TIM_Base_Start_IT(&htim4);
 
-  /*HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
+  empty_data_packet.width = 1;
+  empty_data_packet.reliable = 0;
 
-  HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_SET);
+  unreliable_packet.width = 0;
+  current_i2c_packet.width = 0;
 
-  HAL_I2C_EV_IRQHandler(hi2c);
-  HAL_I2C_MemRxCpltCallback(hi2c);
-  HAL_I2C_EnableListen_IT(hi2c);
-  HAL_I2C_Slave_Receive_IT(hi2c, pData, Size);
-  HAL_I2C_MasterRxCpltCallback(hi2c);
-  HAL_I2C_AddrCallback(hi2c, TransferDirection, AddrMatchCode);
-  HAL_I2C_ListenCpltCallback(hi2c);
-  HAL_I2C_SlaveRxCpltCallback(hi2c);
-  HAL_I2C_Slave_Seq_Receive_IT(hi2c, pData, Size, XferOptions);
-  HAL_I2C_Slave_Receive_IT(hi2c, pData, Size);
-  HAL_I2C_*/
-  //HAL_I2C_
+  for(int i = 0; i < 35; i++)
+  {
+	  empty_data_packet.payload[i] = 0x00;
+	  unreliable_packet.payload[i] = 0x00;
+	  current_i2c_packet.payload[i] = 0x00;
+  }
+
+  NRF24_Init(&nrf_radio);
+
+  HAL_Delay(500);
+
+  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
 
   /* USER CODE END 2 */
 
@@ -135,21 +157,137 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
-	  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
-	  //strcpy((char*)buf, "TESTING\r\n");
-	  //HAL_UART_Transmit(&huart1, buf, strlen((char*)buf), HAL_MAX_DELAY);
-	  //HAL_Delay(100);
 
-	  if(receive_flag == 1)
+	  if(radio_irq_flag == 1)
 	  {
-		  receive_flag = 0;
+		  radio_irq_flag = 0;
 
-		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+		  uint8_t reg_value = NRF24_GetAddress(&nrf_radio, 7);
+
+		  uint8_t tx_success = reg_value & (1 << 5);
+		  uint8_t rx_success = reg_value & (1 << 6);
+		  uint8_t tx_fail = reg_value & (1 << 4);
+
+		  if(tx_success)
+		  {
+			  waiting_for_ack = 0;
+
+			  if(reliable_packet_to_gcs_counter > 0)
+			  {
+				  //Get rid of first index of array and shift
+				  for(int i = 0; i < reliable_packet_to_gcs_counter - 1; i++)
+				  {
+					  reliable_packets_to_gcs[i].width = reliable_packets_to_gcs[i+1].width;
+					  reliable_packets_to_gcs[i].reliable = 1;
+
+					  for(int j = 0; j < 35; j++)
+					  {
+						  reliable_packets_to_gcs[i].payload[j] = reliable_packets_to_gcs[i+1].payload[j];
+					  }
+				  }
+
+				  reliable_packet_to_gcs_counter--;
+			  }
+
+			  if(rx_success)
+			  {
+				  NRF24_PacketRead(&nrf_radio);
+				  NRF24_FlushRX(&nrf_radio);
+				  NRF24_WriteBit(&nrf_radio, 7, 6, 1);
+			  }
+
+			  NRF24_WriteBit(&nrf_radio, 7, 5, 1);
+		  }
+
+		  if(tx_fail)
+		  {
+			  waiting_for_ack = 0;
+			  NRF24_WriteBit(&nrf_radio, 7, 4, 1);
+		  }
+	  }
+
+	  if(GetMicros() - time_since_last_radio_send > 2500 && (new_packet_to_send_available || reliable_packet_to_gcs_counter > 0) && waiting_for_ack == 0)
+	  {
+		  time_since_last_radio_send = GetMicros();
+
 		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
 
-		  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)receieve_buffer, 2);
-		  //HAL_Delay(10);
+		  if(reliable_packet_to_gcs_counter > 0)
+		  {
+			  NRF24_PacketSend(&nrf_radio, &reliable_packets_to_gcs[0]);
+		  }
+		  else
+		  {
+			  new_packet_to_send_available = 0;
+			  NRF24_PacketSend(&nrf_radio, &unreliable_packet);
+		  }
+	  }
+
+	  if(i2c_receive_flag)
+	  {
+		  i2c_receive_flag = 0;
+
+		  if(current_i2c_packet.payload[34])
+		  {
+			  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+
+			  new_packet_to_send_available = 0;
+
+			  if(packets_to_receive_counter > 0)
+			  {
+				  HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)packets_to_receive[packets_to_receive_counter].payload, 34, HAL_MAX_DELAY);
+				  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
+
+				  for(int i = 0; i < packets_to_receive_counter - 1; i++)
+				  {
+					  packets_to_receive[i].width = packets_to_receive[i+1].width;
+					  packets_to_receive[i].reliable = 0;
+
+					  for(int j = 0; j < 35; j++)
+					  {
+						  packets_to_receive[i].payload[j] = packets_to_receive[i+1].payload[j];
+					  }
+				  }
+
+				  packets_to_receive_counter--;
+			  }
+			  else
+			  {
+				  HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, HAL_MAX_DELAY);
+				  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
+			  }
+		  }
+		  else
+		  {
+			  new_packet_to_send_available = 1;
+
+			  current_i2c_packet.width = current_i2c_packet.payload[32];
+			  current_i2c_packet.reliable = current_i2c_packet.payload[33];
+
+			  if(current_i2c_packet.reliable && reliable_packet_to_gcs_counter < 31)
+			  {
+				  reliable_packets_to_gcs[reliable_packet_to_gcs_counter].width = current_i2c_packet.width;
+				  reliable_packets_to_gcs[reliable_packet_to_gcs_counter].reliable = 1;
+				  for(int i = 0; i < 35; i++)
+				  {
+					  reliable_packets_to_gcs[reliable_packet_to_gcs_counter].payload[i] = current_i2c_packet.payload[i];
+				  }
+
+				  reliable_packet_to_gcs_counter++;
+			  }
+			  else if(current_i2c_packet.reliable == 0)
+			  {
+				  unreliable_packet.width = current_i2c_packet.width;
+				  unreliable_packet.reliable = 0;
+
+				  for(int i = 0; i < 35; i++)
+				  {
+					  unreliable_packet.payload[i] = current_i2c_packet.payload[i];
+				  }
+			  }
+
+			  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
+		  }
 	  }
 
     /* USER CODE END WHILE */
@@ -206,9 +344,37 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == NRF_IRQ_Pin)
+	{
+		radio_irq_flag = 1;
+		//HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
+	}
+}
+
 void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
-	receive_flag = 1;
+	i2c_receive_flag = 1;
+}
+
+void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	//HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	if(htim == &htim4)
+	{
+		//Look into overflow
+		micros_timer_base += 65536;
+	}
+}
+
+uint32_t GetMicros()
+{
+	return micros_timer_base + __HAL_TIM_GET_COUNTER(&htim4);
 }
 
 /* USER CODE END 4 */

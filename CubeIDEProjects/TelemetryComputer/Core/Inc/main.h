@@ -56,6 +56,10 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 
 void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c);
+void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c);
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+uint32_t GetMicros();
 
 /* USER CODE END EFP */
 
@@ -80,6 +84,7 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c);
 #define NRF_CSN_GPIO_Port GPIOA
 #define NRF_IRQ_Pin GPIO_PIN_11
 #define NRF_IRQ_GPIO_Port GPIOA
+#define NRF_IRQ_EXTI_IRQn EXTI15_10_IRQn
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

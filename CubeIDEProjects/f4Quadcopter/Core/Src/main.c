@@ -204,7 +204,7 @@ int main(void)
 			  send_buffer[i] = '\0';
 		  }
 
-		  test_gyro_x =
+		  //test_gyro_x =
 
 		  //sprintf((char*)send_buffer, "%ld%s", ppm_channels[2], "\r\n");//int32_t
 		  sprintf((char*)send_buffer, "%lu%s%hd%s", ppm_channels[2], ":", test_gyro_x, "\r\n");//uint32_t

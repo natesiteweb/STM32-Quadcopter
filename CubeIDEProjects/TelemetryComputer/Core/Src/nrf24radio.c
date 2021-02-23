@@ -42,10 +42,10 @@ void NRF24_Init(NRF24_RADIO *radio)
 	    //NRF24_WriteBit(radio, 0, 5, 1); //TX Mask turns off the TX interrupt
 	    //NRF24_WriteBit(radio, 0, 6, 1);
 
-	NRF24_WriteBit(radio, 4, 4, 1);
-	NRF24_WriteBit(radio, 4, 5, 1);
-	NRF24_WriteBit(radio, 4, 6, 0);
-	NRF24_WriteBit(radio, 4, 7, 1);
+	NRF24_WriteBit(radio, 4, 4, 0);//1 wait 2750ms for AA
+	NRF24_WriteBit(radio, 4, 5, 0);//1
+	NRF24_WriteBit(radio, 4, 6, 1);//0
+	NRF24_WriteBit(radio, 4, 7, 1);//1
 
 	NRF24_WriteBit(radio, 4, 3, 0);
 	NRF24_WriteBit(radio, 4, 2, 1);

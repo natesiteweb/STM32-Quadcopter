@@ -68,6 +68,8 @@ volatile uint32_t micros_timer_base;
 
 uint32_t time_since_last_radio_send = 0;
 
+uint32_t test_led_timer = 0;
+
 uint8_t buf[20];
 
 
@@ -157,6 +159,11 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  if(GetMicros() - test_led_timer > 50000)
+	  {
+		  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+		  test_led_timer = GetMicros();
+	  }
 
 	  if(radio_irq_flag == 1)
 	  {
@@ -220,6 +227,7 @@ int main(void)
 		  {
 			  new_packet_to_send_available = 0;
 			  NRF24_PacketSend(&nrf_radio, &unreliable_packet);
+			  //HAL_UART_Transmit(&huart1, unreliable_packet.payload, unreliable_packet.width, HAL_MAX_DELAY);
 		  }
 	  }
 
@@ -227,9 +235,11 @@ int main(void)
 	  {
 		  i2c_receive_flag = 0;
 
+		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+
 		  if(current_i2c_packet.payload[34])
 		  {
-			  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+			  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
 
 			  new_packet_to_send_available = 0;
 

@@ -67,7 +67,7 @@ uint8_t send_buffer[35];
 uint8_t receive_buffer[35];
 
 volatile uint8_t ack_rate_counter = 0;
-uint8_t ack_rate = 10;//Every x ticks of the radio ask for data
+uint8_t ack_rate = 20;//Every x ticks of the radio ask for data
 
 volatile uint32_t current_ppm_capture = 0, last_ppm_capture = 0;
 volatile uint32_t frequency_read = 1000;
@@ -209,6 +209,8 @@ int main(void)
 		  //sprintf((char*)send_buffer, "%ld%s", ppm_channels[2], "\r\n");//int32_t
 		  sprintf((char*)send_buffer, "%lu%s%hd%s", ppm_channels[2], ":", test_gyro_x, "\r\n");//uint32_t
 
+		  //strcpy((char*)send_buffer, "TEST\r\n");
+
 		  if(ack_rate_counter == ack_rate)
 		  {
 			  //ack_rate_counter = 0;
@@ -226,6 +228,7 @@ int main(void)
 		  //send_buffer[34] = 0;//No data
 
 		  HAL_I2C_Master_Transmit_DMA(&hi2c2, (uint8_t)(0x04 << 1), (uint8_t *)send_buffer, 35);
+		  HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 
 		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 	  }
@@ -423,6 +426,7 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
 	{
 		if(ack_rate_counter == ack_rate)
 		{
+			//ack_rate_counter = 0;
 			HAL_I2C_Master_Receive_DMA(&hi2c2, (uint8_t)(0x04 << 1), (uint8_t *)receive_buffer, 34);
 		}
 	}
@@ -434,7 +438,7 @@ void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
 	{
 		ack_rate_counter = 0;
 
-		HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+		//HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 
 		send_buffer[34] = 0;
 	}

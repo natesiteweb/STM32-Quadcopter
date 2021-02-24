@@ -73,8 +73,11 @@ volatile uint32_t current_ppm_capture = 0, last_ppm_capture = 0;
 volatile uint32_t frequency_read = 1000;
 volatile uint8_t current_ppm_channel = 0;
 volatile uint32_t ppm_channels[6];//Channel - 1 because index 0 is channel 1
+volatile uint32_t millis_timer_base;
 
 volatile uint32_t test_max_frequency = 0;
+
+uint32_t test_millis_timer;
 
 int16_t test_gyro_x = 0;
 
@@ -130,9 +133,11 @@ int main(void)
   MX_TIM5_Init();
   MX_TIM8_Init();
   MX_USB_DEVICE_Init();
+  MX_TIM9_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_TIM_IC_Start_IT(&htim5, TIM_CHANNEL_1);
+  HAL_TIM_Base_Start_IT(&htim9);
 
   for(int i = 0; i < 32; i++)
   {
@@ -186,15 +191,27 @@ int main(void)
 
   HAL_Delay(2000);
 
+  uint32_t test_delay_timer = GetMicros();
+  uint32_t test_timer_again = GetMillis();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  HAL_Delay(5);
+	  //HAL_Delay(1000);
 
-	  if(HAL_I2C_GetState(&hi2c2) == HAL_I2C_STATE_READY && send_buffer[34] == 0)
+	  test_delay_timer = GetMicros();
+	  while(GetMicrosDifference(&test_delay_timer) < 500);
+
+	  if(GetMillisDifference(&test_timer_again) > 500)
+	  {
+		  test_timer_again = GetMillis();
+		  HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+	  }
+
+	  if(/*HAL_I2C_GetState(&hi2c2) == HAL_I2C_STATE_READY && */send_buffer[34] == 0)
 	  {
 		  if(ack_rate_counter < 0xFF)
 			  ack_rate_counter++;
@@ -207,7 +224,10 @@ int main(void)
 		  //test_gyro_x =
 
 		  //sprintf((char*)send_buffer, "%ld%s", ppm_channels[2], "\r\n");//int32_t
-		  sprintf((char*)send_buffer, "%lu%s%hd%s", ppm_channels[2], ":", test_gyro_x, "\r\n");//uint32_t
+		  //sprintf((char*)send_buffer, "%c%c%lu%s%hd%s", 0x09 , 0x1E, GetMillisDifference(&test_millis_timer)/*ppm_channels[2]*/, ":", test_gyro_x, "\r\n");//uint32_t
+		  sprintf((char*)send_buffer, "%lu%s%hd%s", GetMillisDifference(&test_millis_timer)/*ppm_channels[2]*/, ":", test_gyro_x, "\r\n");//uint32_t
+		  sprintf((char*)send_buffer, "%c%c%lu%s%hd%s", 0x09 , strlen((char*)send_buffer), GetMicrosDifference(&test_millis_timer)/*ppm_channels[2]*/, ":", test_gyro_x, "\r\n");//uint32_t
+		  test_millis_timer = GetMicros();
 
 		  //strcpy((char*)send_buffer, "TEST\r\n");
 
@@ -225,10 +245,10 @@ int main(void)
 
 		  send_buffer[32] = 30;
 		  send_buffer[33] = 0;//Unreliable
-		  //send_buffer[34] = 0;//No data
+		  send_buffer[34] = 0;//No data
 
 		  HAL_I2C_Master_Transmit_DMA(&hi2c2, (uint8_t)(0x04 << 1), (uint8_t *)send_buffer, 35);
-		  HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+		  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 
 		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 	  }
@@ -414,10 +434,52 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 	}
 }
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+	if(htim == &htim9)
+	{
+		//micros_timer_base += 65000;//65536;
+		millis_timer_base += 65;//Overflow doesn't matter unless board is running for more than 49 days
+	}
+}
+
+uint32_t GetMicros()
+{
+	//return micros_timer_base + __HAL_TIM_GET_COUNTER(&htim4);
+	return __HAL_TIM_GET_COUNTER(&htim9);
+}
+
+uint32_t GetMillis()
+{
+	return millis_timer_base + (GetMicros() / 1000);
+}
+
+uint32_t GetMillisDifference(uint32_t *timer_counter_to_use)
+{
+	return GetMillis() - *timer_counter_to_use;
+}
+
+uint32_t GetMicrosDifference(uint32_t *timer_counter_to_use)
+{
+	uint32_t current_micros = GetMicros();
+	uint32_t micros_difference = 0;
+
+	if(current_micros > *timer_counter_to_use)
+	{
+		micros_difference = current_micros - *timer_counter_to_use;
+	}
+	else if(current_micros < *timer_counter_to_use)
+	{
+		micros_difference = 65000 + current_micros - *timer_counter_to_use;
+	}
+
+	return micros_difference;
+}
+
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
 	read_flag = 1;
-	HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+	//HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 }
 
 void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
@@ -426,8 +488,8 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
 	{
 		if(ack_rate_counter == ack_rate)
 		{
-			//ack_rate_counter = 0;
-			HAL_I2C_Master_Receive_DMA(&hi2c2, (uint8_t)(0x04 << 1), (uint8_t *)receive_buffer, 34);
+			ack_rate_counter = 0;
+			//HAL_I2C_Master_Receive_DMA(&hi2c2, (uint8_t)(0x04 << 1), (uint8_t *)receive_buffer, 34);
 		}
 	}
 }

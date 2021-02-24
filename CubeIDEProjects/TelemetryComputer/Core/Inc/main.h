@@ -60,6 +60,9 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c);
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
 uint32_t GetMicros();
+uint32_t GetMillis();
+uint32_t GetMillisDifference(uint32_t *timer_counter_to_use);
+uint32_t GetMicrosDifference(uint32_t *timer_counter_to_use);
 
 /* USER CODE END EFP */
 

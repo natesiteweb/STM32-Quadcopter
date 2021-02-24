@@ -94,7 +94,7 @@ void NRF24_PacketSend(NRF24_RADIO *radio, data_packet *packet)
 	HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_RESET);
 	NRF24_WriteBit(radio, 0, 0, 0);//Go into TX mode
 	send_delay_timer = GetMicros();
-	while(GetMicros() - send_delay_timer < 500);
+	while(GetMicrosDifference(&send_delay_timer) < 50);
 	HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_SET);
 }
 

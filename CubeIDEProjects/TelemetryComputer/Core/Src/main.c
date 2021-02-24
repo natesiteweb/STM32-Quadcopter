@@ -26,7 +26,6 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-#include "string.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -65,6 +64,7 @@ volatile uint8_t receieve_buffer[32];
 data_packet empty_data_packet;
 
 volatile uint32_t micros_timer_base;
+volatile uint32_t millis_timer_base;
 
 uint32_t time_since_last_radio_send = 0;
 
@@ -378,13 +378,42 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	if(htim == &htim4)
 	{
 		//Look into overflow
-		micros_timer_base += 65536;
+		micros_timer_base += 65000;//65536;
+		millis_timer_base += 65;//Overflow doesn't matter unless board is running for more than 49 days
 	}
 }
 
 uint32_t GetMicros()
 {
-	return micros_timer_base + __HAL_TIM_GET_COUNTER(&htim4);
+	//return micros_timer_base + __HAL_TIM_GET_COUNTER(&htim4);
+	return __HAL_TIM_GET_COUNTER(&htim4);
+}
+
+uint32_t GetMillis()
+{
+	return millis_timer_base + (GetMicros() / 1000);
+}
+
+uint32_t GetMillisDifference(uint32_t *timer_counter_to_use)
+{
+	return GetMillis() - *timer_counter_to_use;
+}
+
+uint32_t GetMicrosDifference(uint32_t *timer_counter_to_use)
+{
+	uint32_t current_micros = GetMicros();
+	uint32_t micros_difference = 0;
+
+	if(current_micros > *timer_counter_to_use)
+	{
+		micros_difference = current_micros - *timer_counter_to_use;
+	}
+	else if(current_micros < *timer_counter_to_use)
+	{
+		micros_difference = 65000 + current_micros - *timer_counter_to_use;
+	}
+
+	return micros_difference;
 }
 
 /* USER CODE END 4 */

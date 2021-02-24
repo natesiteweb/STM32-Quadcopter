@@ -65,6 +65,10 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c);
+uint32_t GetMicros();
+uint32_t GetMillis();
+uint32_t GetMillisDifference(uint32_t *timer_counter_to_use);
+uint32_t GetMicrosDifference(uint32_t *timer_counter_to_use);
 //void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c);
 
 /* USER CODE END EFP */

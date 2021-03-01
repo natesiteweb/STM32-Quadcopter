@@ -68,7 +68,7 @@ volatile uint32_t millis_timer_base;
 
 uint32_t time_since_last_radio_send = 0;
 
-uint32_t test_led_timer = 0;
+uint32_t test_led_timer = 0, test_i2c_last_received;
 
 uint8_t buf[20];
 
@@ -153,16 +153,30 @@ int main(void)
 
   HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
 
+  test_i2c_last_received = GetMillis();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  if(GetMicros() - test_led_timer > 50000)
+	  if(GetMillisDifference(&test_i2c_last_received) > 900 && GetMillis() > 5000)
 	  {
-		  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
-		  test_led_timer = GetMicros();
+		  //HAL_I2C_DeInit(&hi2c1);
+		  //MX_I2C1_Init();
+		  //test_i2c_last_received = GetMillis();
+		  //HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+	  }
+	  else
+	  {
+		  //HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+	  }
+
+	  if(GetMillisDifference(&test_led_timer) > 500)
+	  {
+		  test_led_timer = GetMillis();
+		  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 	  }
 
 	  if(radio_irq_flag == 1)
@@ -213,11 +227,12 @@ int main(void)
 		  }
 	  }
 
-	  if(GetMicros() - time_since_last_radio_send > 2500 && (new_packet_to_send_available || reliable_packet_to_gcs_counter > 0) && waiting_for_ack == 0)
+	  if(GetMicrosDifference(&time_since_last_radio_send) > 500 && (new_packet_to_send_available || reliable_packet_to_gcs_counter > 0) && waiting_for_ack == 0)
 	  {
 		  time_since_last_radio_send = GetMicros();
 
-		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
+		  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
+		  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
 
 		  if(reliable_packet_to_gcs_counter > 0)
 		  {
@@ -235,15 +250,31 @@ int main(void)
 	  {
 		  i2c_receive_flag = 0;
 
-		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+		  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
+		  //HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+		  test_i2c_last_received = GetMillis();
 
 		  if(current_i2c_packet.payload[34])
 		  {
+			  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
 			  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
 
 			  new_packet_to_send_available = 0;
+			  //while(HAL_I2C_GetState(&hi2c1) != HAL_I2C_STATE_READY)
+			  //HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, HAL_MAX_DELAY);
+			  //HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, 50);
 
-			  if(packets_to_receive_counter > 0)
+			  uint8_t max_retry_counter = 0;
+
+			  while((max_retry_counter < 5) && HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, 20) != HAL_OK)
+			  {
+				  max_retry_counter++;
+			  }
+			  //while(HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, 20) != HAL_OK);
+			  //while(HAL_I2C_GetState(&hi2c1) != HAL_I2C_STATE_READY);
+			  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
+
+			  /*if(packets_to_receive_counter > 0)
 			  {
 				  HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)packets_to_receive[packets_to_receive_counter].payload, 34, HAL_MAX_DELAY);
 				  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
@@ -265,7 +296,7 @@ int main(void)
 			  {
 				  HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, HAL_MAX_DELAY);
 				  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
-			  }
+			  }*/
 		  }
 		  else
 		  {
@@ -383,10 +414,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	}
 }
 
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c)
+{
+	//HAL_I2C_DeInit(&hi2c1);
+	//MX_I2C1_Init();
+	HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+}
+
 uint32_t GetMicros()
 {
 	//return micros_timer_base + __HAL_TIM_GET_COUNTER(&htim4);
 	return __HAL_TIM_GET_COUNTER(&htim4);
+	//return 0;
 }
 
 uint32_t GetMillis()

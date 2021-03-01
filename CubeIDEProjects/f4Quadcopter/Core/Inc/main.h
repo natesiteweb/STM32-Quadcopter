@@ -49,13 +49,10 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
 
-extern volatile uint8_t ack_rate_counter;
-extern uint8_t ack_rate;
-
 extern uint8_t read_flag;
-
-extern uint8_t send_buffer[35];
-extern uint8_t receive_buffer[35];
+extern uint32_t how_long_to_loop, how_long_to_loop_timer;
+extern uint32_t test_millis_timer;
+volatile uint32_t ppm_channels[7];
 
 /* USER CODE END EM */
 
@@ -64,7 +61,14 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim);
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
 void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c);
+void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c);
+void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c);
+void HAL_I2C_AbortCpltCallback(I2C_HandleTypeDef *hi2c);
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c);
+void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim);
 uint32_t GetMicros();
 uint32_t GetMillis();
 uint32_t GetMillisDifference(uint32_t *timer_counter_to_use);

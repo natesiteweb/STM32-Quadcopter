@@ -1,0 +1,2 @@
+telemetry.c:38:6:telem_loop	24	static
+telemetry.c:110:6:AddToAutoBuffer	16	static

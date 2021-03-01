@@ -94,7 +94,8 @@ void NRF24_PacketSend(NRF24_RADIO *radio, data_packet *packet)
 	HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_RESET);
 	NRF24_WriteBit(radio, 0, 0, 0);//Go into TX mode
 	send_delay_timer = GetMicros();
-	while(GetMicrosDifference(&send_delay_timer) < 50);
+	while(GetMicrosDifference(&send_delay_timer) < 20);
+	//HAL_Delay(2);
 	HAL_GPIO_WritePin(NRF_CE_GPIO_Port, NRF_CE_Pin, GPIO_PIN_SET);
 }
 
@@ -112,30 +113,30 @@ void NRF24_PacketRead(NRF24_RADIO *radio)
 	HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_SET);
 	packet_width = rxBuf[1];
 
-	txBuf[0] = 0b01100001;
-	HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_RESET);
-	HAL_SPI_TransmitReceive(radio->spiHandle, txBuf, rxBuf, 1, HAL_MAX_DELAY);
-
 	for(int i = 0; i < 32; i++)
 	{
 		txBuf[i] = 0;
 		rxBuf[i] = 0;
 	}
 
-	HAL_SPI_TransmitReceive(radio->spiHandle, txBuf, rxBuf, packet_width, HAL_MAX_DELAY);
+	txBuf[0] = 0b01100001;
+	HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_RESET);
+	HAL_SPI_TransmitReceive(radio->spiHandle, txBuf, rxBuf, (uint8_t)(packet_width + 1), HAL_MAX_DELAY);
+
+	//HAL_SPI_TransmitReceive(radio->spiHandle, txBuf, rxBuf, packet_width, HAL_MAX_DELAY);
 	HAL_GPIO_WritePin(NRF_CSN_GPIO_Port, NRF_CSN_Pin, GPIO_PIN_SET);
 
-	if(rxBuf[0] != 0x00)
+	if(rxBuf[1] != 0x00)
 	{
 		packets_to_receive[packets_to_receive_counter].width = packet_width;
 		packets_to_receive[packets_to_receive_counter].reliable = 1;
 
 		for(int i = 0; i < packet_width; i++)
 		{
-			packets_to_receive[packets_to_receive_counter].payload[i] = rxBuf[i];
+			packets_to_receive[packets_to_receive_counter].payload[i] = rxBuf[i + 1];
 		}
 
-		if(packets_to_receive_counter < 31)
+		if(packets_to_receive_counter < 30)
 			packets_to_receive_counter++;
 	}
 }

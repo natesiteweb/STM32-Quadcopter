@@ -31,6 +31,9 @@
 
 #include "usbd_cdc_if.h"
 #include "string.h"
+#include "telemetry.h"
+#include "math.h"
+#include "imu.h"
 
 /* USER CODE END Includes */
 
@@ -55,32 +58,27 @@
 uint8_t data[6] = "hello\n";
 
 HAL_StatusTypeDef ret;
-static const uint8_t GYRO_ADDR = 0x68 << 1;
-uint8_t buf[40];
 uint8_t test_gyro_send_buf[40];
 volatile uint32_t val;
 volatile uint32_t i2c_transmit_timer = 0;
 float gyro_x;
 
 uint8_t read_flag = 0;
-uint8_t send_buffer[35];
-uint8_t receive_buffer[35];
-
-volatile uint8_t ack_rate_counter = 0;
-uint8_t ack_rate = 20;//Every x ticks of the radio ask for data
 
 volatile uint32_t current_ppm_capture = 0, last_ppm_capture = 0;
 volatile uint32_t frequency_read = 1000;
 volatile uint8_t current_ppm_channel = 0;
-volatile uint32_t ppm_channels[6];//Channel - 1 because index 0 is channel 1
+volatile uint32_t ppm_channels[7];//Channel - 1 because index 0 is channel 1
 volatile uint32_t millis_timer_base;
 
 volatile uint32_t test_max_frequency = 0;
 
-uint32_t test_millis_timer;
+uint32_t pwm_output_timer, main_loop_timer;
+uint32_t how_long_to_loop, how_long_to_loop_timer;
 
-int16_t test_gyro_x = 0;
+uint32_t test_millis_timer, temp_led_timer;
 
+uint8_t temp_test_text_buffer[35];
 
 /* USER CODE END PV */
 
@@ -138,11 +136,31 @@ int main(void)
 
   HAL_TIM_IC_Start_IT(&htim5, TIM_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim9);
+  //HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
+  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_4);//Motor 1 - FL
+  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_3);//Motor 2 - FR
+  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_2);//Motor 3 - BR
+  HAL_TIM_PWM_Start(&htim8, TIM_CHANNEL_1);//Motor 4 - BL
 
-  for(int i = 0; i < 32; i++)
+  auto_packet_buffer[0].total_width = 0;
+  auto_packet_buffer[0].var_count = 0;
+  auto_packet_buffer[0].id = 0x01;
+  AddToAutoBuffer(0, &(raw_gyro_acc_data[0]), 2);
+  AddToAutoBuffer(0, &(raw_gyro_acc_data[1]), 2);
+  AddToAutoBuffer(0, &(raw_gyro_acc_data[2]), 2);
+  auto_packet_count += 1;
+
+  for(int i = 0; i < 6; i++)
   {
-	  send_buffer[i] = '\0';
+	  ppm_channels[i] = 1000;
   }
+
+  for(int i = 0; i < 35; i++)
+  {
+	  empty_data_packet.payload[i] = '\0';
+  }
+
+  Setup_IMU();
 
   /*send_buffer[0] = 0x09;
   send_buffer[1] = 6;
@@ -155,44 +173,15 @@ int main(void)
 
   //sprintf((char*)send_buffer, "%l%s", test_capture_value, "\r\n");
 
-  send_buffer[32] = 30;
-  send_buffer[33] = 0;//Unreliable
-  send_buffer[34] = 0;//No data
 
-  buf[0] = 0x6B;
-  buf[1] = 0x00;
-  ret = HAL_I2C_Master_Transmit(&hi2c1, GYRO_ADDR, buf, 2, HAL_MAX_DELAY);
-  if(ret != HAL_OK)
-  {
-	  strcpy((char*)buf, "Error Tx\r\n");
-  }
 
-  HAL_Delay(10);
-
-  buf[0] = 0x1B;
-  buf[1] = 0x08;
-  ret = HAL_I2C_Master_Transmit(&hi2c1, GYRO_ADDR, buf, 2, HAL_MAX_DELAY);
-  if(ret != HAL_OK)
-  {
-	  strcpy((char*)buf, "Error Tx\r\n");
-  }
-
-  HAL_Delay(10);
-
-  buf[0] = 0x1A;
-  buf[1] = 0x03;
-  ret = HAL_I2C_Master_Transmit(&hi2c1, GYRO_ADDR, buf, 2, HAL_MAX_DELAY);
-  if(ret != HAL_OK)
-  {
-	  strcpy((char*)buf, "Error Tx\r\n");
-  }
+  telem_send_buffer[32] = 30;
+  telem_send_buffer[33] = 0;//Unreliable
+  //send_buffer[34] = 0;//No data
 
   //CDC_Transmit_FS(buf, strlen((char*)buf));
 
   HAL_Delay(2000);
-
-  uint32_t test_delay_timer = GetMicros();
-  uint32_t test_timer_again = GetMillis();
 
   /* USER CODE END 2 */
 
@@ -200,119 +189,65 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  //HAL_Delay(1000);
-
-	  test_delay_timer = GetMicros();
-	  while(GetMicrosDifference(&test_delay_timer) < 500);
-
-	  if(GetMillisDifference(&test_timer_again) > 500)
+	  if(GetMillisDifference(&test_millis_timer) > 500)
 	  {
-		  test_timer_again = GetMillis();
-		  HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+		  //HAL_I2C_DeInit(&hi2c2);
+		  //MX_I2C2_Init();
+		  //HAL_Delay(10);
+		  //telem_send_buffer[34] = 0;
+		  //HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
+	  }
+	  else
+	  {
+		  //HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
 	  }
 
-	  if(/*HAL_I2C_GetState(&hi2c2) == HAL_I2C_STATE_READY && */send_buffer[34] == 0)
+	  if(GetMillisDifference(&temp_led_timer) > 500)
 	  {
-		  if(ack_rate_counter < 0xFF)
-			  ack_rate_counter++;
+		  temp_led_timer = GetMillis();
 
-		  for(int i = 0; i < 32; i++)
-		  {
-			  send_buffer[i] = '\0';
-		  }
-
-		  //test_gyro_x =
-
-		  //sprintf((char*)send_buffer, "%ld%s", ppm_channels[2], "\r\n");//int32_t
-		  //sprintf((char*)send_buffer, "%c%c%lu%s%hd%s", 0x09 , 0x1E, GetMillisDifference(&test_millis_timer)/*ppm_channels[2]*/, ":", test_gyro_x, "\r\n");//uint32_t
-		  sprintf((char*)send_buffer, "%lu%s%hd%s", GetMillisDifference(&test_millis_timer)/*ppm_channels[2]*/, ":", test_gyro_x, "\r\n");//uint32_t
-		  sprintf((char*)send_buffer, "%c%c%lu%s%hd%s", 0x09 , strlen((char*)send_buffer), GetMicrosDifference(&test_millis_timer)/*ppm_channels[2]*/, ":", test_gyro_x, "\r\n");//uint32_t
-		  test_millis_timer = GetMicros();
-
-		  //strcpy((char*)send_buffer, "TEST\r\n");
-
-		  if(ack_rate_counter == ack_rate)
-		  {
-			  //ack_rate_counter = 0;
-			  send_buffer[34] = 1;
-		  }
-		  else
-		  {
-			  send_buffer[34] = 0;
-		  }
-
-
-
-		  send_buffer[32] = 30;
-		  send_buffer[33] = 0;//Unreliable
-		  send_buffer[34] = 0;//No data
-
-		  HAL_I2C_Master_Transmit_DMA(&hi2c2, (uint8_t)(0x04 << 1), (uint8_t *)send_buffer, 35);
 		  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-
-		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 	  }
 
-	  if(read_flag == 1)
+	  if(GetMicrosDifference(&pwm_output_timer) >= 4000)
+	  {
+		  pwm_output_timer = GetMicros();
+		  __HAL_TIM_SET_COUNTER(&htim8, 4999); //Reset motor PWN counter for fast response time
+	  }
+
+	  if(GetMicrosDifference(&main_loop_timer) >= 2000)
+	  {
+		  how_long_to_loop = GetMicrosDifference(&how_long_to_loop_timer);
+		  main_loop_timer = GetMicros();
+		  how_long_to_loop_timer = GetMicros();
+		  Read_IMU();
+
+		  telem_loop();
+	  }
+
+	  if(GetMillisDifference(&telem_receive_timout_timer) > 50 && telem_send_buffer[34])
+	  {
+		  HAL_I2C_Master_Abort_IT(&hi2c2, (uint8_t)(0x04 << 1));
+	  }
+
+	  /*if(read_flag == 1)
 	  {
 		  read_flag = 0;
 
 		  test_gyro_x = (int16_t)((buf[0] << 8) | (buf[1]));
 
 		  gyro_x = test_gyro_x / 65.5;
-
-		  //i2c_transmit_timer = HAL_GetTick();
-		  //i2c_transmit_timer = DWT->CYCCNT * (HAL_RCC_GetHCLKFreq() / 1000000);
-		  //HAL_Delay(10);
-
-
-
-		  //HAL_I2C_Master_Transmit();
-		  //HAL_I2C_Master_Transmit_IT();
-		  //HAL_Delay(5);
-		  //val = ((DWT->CYCCNT * (HAL_RCC_GetHCLKFreq() / 1000000)) - i2c_transmit_timer);
-		  //val = (HAL_GetTick() - i2c_transmit_timer);
-
-		  //val = (int16_t)((buf[0] << 8) | (buf[1]));
-		  //gyro_x = val;
-		  //itoa(val, buf, 10);
-		  //itoa(val, buf, 10);
-		  /*if(val > 0)
-	  		{
-	  			sprintf((char*)buf, "%s", "1\r\n");
-	  		}
-	  		else
-	  		{
-	  			sprintf((char*)buf, "%s", "0\r\n");
-	  		}*/
-		  //sprintf((char*)buf, "%lu%s", val, "\r\n");
-		  //snprintf((char*)buf, 0, "%lu%s", val, "\r\n");
-
-		  //CDC_Transmit_FS(buf, strlen((char*)buf));
-
-
-		  //HAL_Delay(10);
-		  //i2c_transmit_timer = DWT->CYCCNT * (HAL_RCC_GetHCLKFreq() / 1000000);
-		  //HAL_I2C_Master_Receive_IT(hi2c, DevAddress, pData, Size)
 	  }
 
 	  if(HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_READY)
 	  {
 		  HAL_I2C_Mem_Read_DMA(&hi2c1, GYRO_ADDR, 0x43, I2C_MEMADD_SIZE_8BIT, (uint8_t *)buf, 2);
-	  }
+	  }*/
 
-	  //ret = HAL_I2C_Mem_Read(&hi2c1, GYRO_ADDR, 0x43, 1, buf, 2, HAL_MAX_DELAY);
-	  /*if(ret != HAL_OK)
-	  	{
-	  		strcpy((char*)buf, "Error Rx\r\n");
-	  	}
-	  	else
-	  	{
-	  		val = (int16_t)((buf[0] << 8) | (buf[1]));
-	  		gyro_x = val;
-	  		itoa(val, buf, 10);
-	  		sprintf((char*)buf, "%s%s", buf, "\r\n");
-	  	}*/
+	  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_4, ppm_channels[2]);
+	  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, ppm_channels[2]);
+	  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, ppm_channels[2]);
+	  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, ppm_channels[2]);
 
     /* USER CODE END WHILE */
 
@@ -406,7 +341,7 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 				frequency_read = 0xFFFFFFFF + current_ppm_capture - last_ppm_capture;
 			}
 
-			frequency_read /= 2;
+			//frequency_read /= 2;
 
 			if(frequency_read > 3000)
 			{
@@ -423,6 +358,11 @@ void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
 			}
 
 			frequency_read += 400;
+
+			if(frequency_read < 1000)
+				frequency_read = 1000;
+			else if(frequency_read > 2000)
+				frequency_read = 2000;
 
 			if(current_ppm_channel >= 1 && current_ppm_channel <= 6)
 			{
@@ -488,8 +428,12 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
 	{
 		if(ack_rate_counter == ack_rate)
 		{
-			ack_rate_counter = 0;
-			//HAL_I2C_Master_Receive_DMA(&hi2c2, (uint8_t)(0x04 << 1), (uint8_t *)receive_buffer, 34);
+			//receive_telem_flag = 1;
+			//ack_rate_counter = 0;
+			//telem_receive_timout_timer = GetMillis();
+			HAL_I2C_Master_Receive_DMA(&hi2c2, (uint8_t)(0x04 << 1), (uint8_t *)telem_receive_buffer, 34);
+
+			//HAL_I2C_Master_Receive(&hi2c2, (uint8_t)(0x04 << 1), (uint8_t *)receive_buffer, 34, 1);
 		}
 	}
 }
@@ -499,11 +443,33 @@ void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
 	if(hi2c == &hi2c2)
 	{
 		ack_rate_counter = 0;
-
-		//HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-
-		send_buffer[34] = 0;
+		new_telem_received = 1;
+		telem_send_buffer[34] = 0;
+		waiting_for_ack = 0;
 	}
+}
+
+void HAL_I2C_AbortCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	if(hi2c == &hi2c2)
+	{
+		telem_send_buffer[34] = 0;
+		ack_rate_counter = 0;
+		waiting_for_ack = 0;
+	}
+}
+
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c)
+{
+	if(hi2c == &hi2c2)
+	{
+		HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
+	}
+}
+
+void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
+{
+
 }
 
 /* USER CODE END 4 */

@@ -11,10 +11,12 @@
 #include "stm32f4xx_hal.h"
 
 void Setup_IMU(void);
-void Read_IMU(void);
+void Calibrate_IMU(void);
+void Read_IMU(uint8_t is_calibrating);
 
 extern int16_t raw_gyro_acc_data[6];
 extern float gyro_x, gyro_y, gyro_z;
+extern float gyro_x_angle, gyro_y_angle, gyro_z_angle;
 extern float acc_magnitude, acc_x, acc_y, acc_z;
 
 #endif /* INC_IMU_H_ */

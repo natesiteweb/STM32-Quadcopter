@@ -1,8 +1,8 @@
 nrf24radio.c:34:6:NRF24_Init	16	static
 nrf24radio.c:80:6:NRF24_PacketSend	32	static
 nrf24radio.c:102:6:NRF24_PacketRead	32	static
-nrf24radio.c:147:6:NRF24_WriteBit	24	static
-nrf24radio.c:172:9:NRF24_GetAddress	24	static
-nrf24radio.c:187:6:NRF24_FlushTX	24	static
-nrf24radio.c:198:6:NRF24_FlushRX	24	static
-nrf24radio.c:209:6:NRF24_ClearInterrupts	16	static
+nrf24radio.c:148:6:NRF24_WriteBit	24	static
+nrf24radio.c:173:9:NRF24_GetAddress	24	static
+nrf24radio.c:188:6:NRF24_FlushTX	24	static
+nrf24radio.c:199:6:NRF24_FlushRX	24	static
+nrf24radio.c:210:6:NRF24_ClearInterrupts	16	static

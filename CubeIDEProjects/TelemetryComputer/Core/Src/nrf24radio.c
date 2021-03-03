@@ -128,6 +128,7 @@ void NRF24_PacketRead(NRF24_RADIO *radio)
 
 	if(rxBuf[1] != 0x00)
 	{
+		HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 		packets_to_receive[packets_to_receive_counter].width = packet_width;
 		packets_to_receive[packets_to_receive_counter].reliable = 1;
 

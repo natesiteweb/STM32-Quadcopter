@@ -50,9 +50,8 @@ extern "C" {
 /* USER CODE BEGIN EM */
 
 extern uint8_t read_flag;
-extern uint32_t how_long_to_loop, how_long_to_loop_timer;
-extern uint32_t test_millis_timer;
-volatile uint32_t ppm_channels[7];
+extern uint32_t how_long_to_loop_main;
+extern volatile uint32_t ppm_channels[7];
 
 /* USER CODE END EM */
 

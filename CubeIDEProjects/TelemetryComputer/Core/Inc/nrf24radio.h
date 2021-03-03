@@ -27,7 +27,7 @@ typedef struct
 
 typedef struct
 {
-	uint8_t payload[35];//32 is packet width, 33 is 1 for reliable, 34 is request bit(1 if master is asking for data)
+	uint8_t payload[35];//32 is packet width, 33 is 1 for reliable, 34 is request bit(1 if master is asking for data)(NOT USED ANYMORE)
 	uint8_t width;
 	uint8_t reliable;
 } data_packet;
@@ -39,6 +39,9 @@ extern data_packet reliable_packets_to_gcs[32];
 extern volatile data_packet current_i2c_packet;
 extern data_packet unreliable_packet;
 extern uint8_t reliable_packet_to_gcs_counter;
+
+extern data_packet empty_data_packet;
+extern volatile data_packet *packet_to_send_to_master;
 
 extern volatile data_packet packets_to_receive[32];
 extern uint8_t packets_to_receive_counter;

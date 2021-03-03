@@ -24,6 +24,8 @@ int16_t raw_gyro_acc_data[6];//0:2 gyro xyz, 3:5 accel xyz
 int16_t raw_imu_temp;
 float gyro_x, gyro_y, gyro_z;
 float acc_magnitude, acc_x, acc_y, acc_z;
+float gyro_x_angle, gyro_y_angle, gyro_z_angle;
+float gyro_x_calibration, gyro_y_calibration, gyro_z_calibration;
 
 void Setup_IMU()
 {
@@ -56,7 +58,27 @@ void Setup_IMU()
 	}
 }
 
-void Read_IMU()
+void Calibrate_IMU()
+{
+	for(int i = 0; i < 2000; i++)
+	{
+		Read_IMU(1);
+		gyro_x_calibration += raw_gyro_acc_data[0];
+		gyro_y_calibration += raw_gyro_acc_data[1];
+		gyro_z_calibration += raw_gyro_acc_data[2];
+		HAL_Delay(2);
+	}
+
+	gyro_x_angle = 0;
+	gyro_y_angle = 0;
+	gyro_z_angle = 0;
+
+	gyro_x_calibration /= 2000;
+	gyro_y_calibration /= 2000;
+	gyro_z_calibration /= 2000;
+}
+
+void Read_IMU(uint8_t is_calibrating)
 {
 	HAL_I2C_Mem_Read(&hi2c1, GYRO_ADDR, 0x3B, I2C_MEMADD_SIZE_8BIT, (uint8_t *)raw_gyro_acc_buffer, 14, HAL_MAX_DELAY);//Implement failure logic later
 	raw_gyro_acc_data[3] = (int16_t)((raw_gyro_acc_buffer[0] << 8) | (raw_gyro_acc_buffer[1]));	//Acc X
@@ -67,21 +89,10 @@ void Read_IMU()
 	raw_gyro_acc_data[1] = (int16_t)((raw_gyro_acc_buffer[10] << 8) | (raw_gyro_acc_buffer[11]));	//Gyro Y
 	raw_gyro_acc_data[2] = (int16_t)((raw_gyro_acc_buffer[12] << 8) | (raw_gyro_acc_buffer[13]));	//Gyro Z
 
-	gyro_x = (float)raw_gyro_acc_data[0] / 65.5;
-	gyro_y = (float)raw_gyro_acc_data[1] / 65.5;
-	gyro_z = (float)raw_gyro_acc_data[2] / 65.5;
-
-	acc_magnitude = sqrt(((float)raw_gyro_acc_data[3] * (float)raw_gyro_acc_data[3]) + ((float)raw_gyro_acc_data[4] * (float)raw_gyro_acc_data[4]) + ((float)raw_gyro_acc_data[5] * (float)raw_gyro_acc_data[5]));
-
-	if(acc_magnitude != 0)
+	if(!is_calibrating)
 	{
-		if(abs(raw_gyro_acc_data[4]) <= acc_magnitude)
-		{
-			acc_x = asin((float)raw_gyro_acc_data[4] / acc_magnitude) * 57.296;
-		}
-		else if(abs(raw_gyro_acc_data[3]) < acc_magnitude)
-		{
-			acc_y = asin((float)raw_gyro_acc_data[3] / acc_magnitude) * 57.296;
-		}
+		raw_gyro_acc_data[0] -= gyro_x_calibration;
+		raw_gyro_acc_data[1] -= gyro_y_calibration;
+		raw_gyro_acc_data[2] -= gyro_z_calibration;
 	}
 }

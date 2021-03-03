@@ -1,2 +1,5 @@
-telemetry.c:38:6:telem_loop	24	static
-telemetry.c:110:6:AddToAutoBuffer	16	static
+telemetry.c:48:6:telem_loop	64	static
+telemetry.c:255:6:AddToAutoBuffer	16	static
+telemetry.c:263:6:AddIDToManualBuffer	16	static
+telemetry.c:268:6:AddToManualBuffer	24	static
+telemetry.c:278:6:ReadReceiveBuffer	24	static

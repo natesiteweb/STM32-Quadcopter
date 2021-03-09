@@ -216,7 +216,7 @@ void Control_Loop()
 			case 0x00:	//No OP
 				program_counter += 1;
 				break;
-			case 0x01:	//Toggle LED
+			case 0x01:	//Toggle LED: uint8_t
 				if(*(uint8_t *)&program_buffer[program_counter + 1] == 0x01)
 				{
 					HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
@@ -228,13 +228,15 @@ void Control_Loop()
 
 				program_counter += 2;
 				break;
-			case 0x02:	//Wait
+			case 0x02:	//Wait: uint32_t
 				control_loop_wait_timer = GetMillis();
 				control_loop_wait_time = *(uint32_t *)&program_buffer[program_counter + 1];
 				program_counter += 5;
 				break;
 			case 0x03:	//Restart program
 				program_counter = 0;
+				break;
+			case 0x04:	//
 				break;
 			}
 		}

@@ -51,7 +51,9 @@ extern "C" {
 
 extern uint8_t read_flag;
 extern uint32_t how_long_to_loop_main;
-extern volatile uint32_t ppm_channels[7];
+extern float how_long_to_loop_modifier;
+extern volatile int32_t ppm_channels[6];
+extern uint32_t main_loop_timer;
 
 /* USER CODE END EM */
 

@@ -1,3 +1,4 @@
+"Core/Src/bmp280.o"
 "Core/Src/control_logic.o"
 "Core/Src/dma.o"
 "Core/Src/eeprom.o"

@@ -1,0 +1,5 @@
+eeprom.c:21:6:EEPROM_Clear_Buffer	16	static
+eeprom.c:30:6:EEPROM_Save_Page	24	static
+eeprom.c:38:6:EEPROM_Read_Page	32	static
+eeprom.c:43:6:EEPROM_Write_Buffer	24	static
+eeprom.c:53:6:EEPROM_Read_Buffer	24	static

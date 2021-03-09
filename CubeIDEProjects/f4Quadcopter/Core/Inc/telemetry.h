@@ -11,6 +11,9 @@
 #include "stm32f4xx_hal.h"
 
 void telem_loop(void);
+void ClearManualBuffer(void);
+void ClearPrintBuffer(void);
+void PrintManualPacket(void);
 void AddToAutoBuffer(uint8_t buf_index, uint8_t *num, uint8_t size);
 void AddIDToManualBuffer(uint8_t id);
 void AddToManualBuffer(uint8_t *num, uint8_t size);
@@ -21,14 +24,18 @@ typedef struct
 	uint8_t id;
 	uint8_t *payload[32];
 	uint8_t width[32];
+	uint8_t reliable;
 	uint8_t var_count;
 	uint8_t total_width;
+	uint8_t send_rate;
+	uint8_t cycles_since_last_sent;
 } data_packet_pointer;
 
 typedef struct
 {
 	uint8_t payload[35];
 	uint8_t width;
+	uint8_t reliable;
 } data_packet;
 
 extern volatile uint8_t telem_send_buffer[35];
@@ -36,9 +43,9 @@ extern volatile uint8_t telem_receive_buffer[35];
 extern data_packet empty_data_packet;
 extern volatile uint8_t ack_rate_counter;
 extern uint8_t ack_rate;
-extern uint8_t waiting_to_rx;
-extern uint8_t rx_done;
-extern uint8_t tx_done;
+extern volatile uint8_t waiting_to_rx;
+extern volatile uint8_t rx_done;
+extern volatile uint8_t tx_done;
 extern data_packet manual_packet_buffer[32];
 extern uint8_t manual_packet_count;
 
@@ -52,6 +59,7 @@ extern uint32_t acks_per_second;
 enum
 {
     GYRO_PACKET = 0x01,
+	PID_OUTPUT_PACKET = 0x02,
     PID_GAIN_FIRST_PACKET = 0x03,
     ALTITUDE_PACKET = 0x06,
     ALTITUDE_SET_PACKET = 0x07,

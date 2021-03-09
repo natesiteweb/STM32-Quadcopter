@@ -16,9 +16,10 @@
 #include "stdlib.h"
 #include "control_logic.h"
 #include "eeprom.h"
+#include "bmp280.h"
 
 uint32_t telem_min_transmit_timer;
-
+char print_text_buffer[32];
 data_packet manual_packet_buffer[32];
 uint8_t manual_packet_count = 0;
 
@@ -36,14 +37,15 @@ uint8_t ack_rate = 10;//Every x ticks of the radio ask for data
 
 uint8_t transmit_fail_flag = 0;	//If transmission failed, reset everything and try again
 uint8_t receive_fail_flag = 0;
-uint8_t waiting_to_rx = 0; 		//Waiting until we ask for receive
-uint8_t rx_done = 0;			//Response received
-uint8_t tx_done = 0;
+volatile uint8_t waiting_to_rx = 0; 		//Waiting until we ask for receive
+volatile uint8_t rx_done = 0;			//Response received
+volatile uint8_t tx_done = 0;
 
 uint32_t acks_per_second_timer;
 uint32_t acks_counted;
 uint32_t acks_per_second;
 
+uint32_t time_to_telem_timer, time_to_telem;
 
 void telem_loop()
 {
@@ -66,60 +68,58 @@ void telem_loop()
 			case 0x00:
 				break;
 			case CALIBRATE_GYRO_REQUEST:
+				Calibrate_BMP280();
 				Calibrate_IMU();
-
-				for(int i = 0; i < 35; i++)
-				{
-					manual_packet_buffer[manual_packet_count].payload[i] = '\0';
-				}
-
-				sprintf((char*)(manual_packet_buffer[manual_packet_count].payload), "%s", "Gyro Calibrated.\n");//uint32_t
-				sprintf((char*)(manual_packet_buffer[manual_packet_count].payload), "%c%c%s", 0x09 , strlen((char*)(manual_packet_buffer[manual_packet_count].payload)), "Gyro Calibrated.\n");
-
-				manual_packet_buffer[manual_packet_count].width = strlen((char *)(manual_packet_buffer[manual_packet_count].payload));
-
-				if(manual_packet_count < 31)
-					manual_packet_count++;
+				ClearManualBuffer();
+				ClearPrintBuffer();
+				sprintf((char *)print_text_buffer, "%s", "Gyro Calibrated.\n");
+				PrintManualPacket();
 				break;
 			case PID_GAIN_FIRST_REQUEST:
-				HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-				for(int i = 0; i < 35; i++)
-				{
-					manual_packet_buffer[manual_packet_count].payload[i] = '\0';
-				}
+				//HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+				ClearManualBuffer();
 				manual_packet_buffer[manual_packet_count].width = 1;
+				manual_packet_buffer[manual_packet_count].reliable = 1;
 				AddIDToManualBuffer(PID_GAIN_FIRST_PACKET);
-				AddToManualBuffer(&kp_roll, 4);
-				AddToManualBuffer(&ki_roll, 4);
-				AddToManualBuffer(&kd_roll, 4);
-				AddToManualBuffer(&kp_yaw, 4);
-				AddToManualBuffer(&ki_yaw, 4);
-				AddToManualBuffer(&kd_yaw, 4);
+				AddToManualBuffer((uint8_t *)&kp_roll, 4);
+				AddToManualBuffer((uint8_t *)&ki_roll, 4);
+				AddToManualBuffer((uint8_t *)&kd_roll, 4);
+				AddToManualBuffer((uint8_t *)&kp_yaw, 4);
+				AddToManualBuffer((uint8_t *)&ki_yaw, 4);
+				AddToManualBuffer((uint8_t *)&kd_yaw, 4);
 
 				if(manual_packet_count < 31)
 					manual_packet_count++;
 				break;
 			case PID_GAIN_FIRST_UPDATE_REQUEST:
 				telem_receive_read_index = 1;
-				ReadReceiveBuffer(&kp_roll, 4);
-				ReadReceiveBuffer(&ki_roll, 4);
-				ReadReceiveBuffer(&kd_roll, 4);
-				ReadReceiveBuffer(&kp_yaw, 4);
-				ReadReceiveBuffer(&ki_yaw, 4);
-				ReadReceiveBuffer(&kd_yaw, 4);
+				ReadReceiveBuffer((uint8_t *)&kp_roll, 4);
+				ReadReceiveBuffer((uint8_t *)&ki_roll, 4);
+				ReadReceiveBuffer((uint8_t *)&kd_roll, 4);
+				ReadReceiveBuffer((uint8_t *)&kp_yaw, 4);
+				ReadReceiveBuffer((uint8_t *)&ki_yaw, 4);
+				ReadReceiveBuffer((uint8_t *)&kd_yaw, 4);
 
-				for(int i = 0; i < 35; i++)
-				{
-					manual_packet_buffer[manual_packet_count].payload[i] = '\0';
-				}
+				EEPROM_Clear_Buffer();
+				eeprom_write_buffer_width = 2;
+				EEPROM_Write_Buffer((uint8_t *)&kp_roll, 4);
+				EEPROM_Write_Buffer((uint8_t *)&ki_roll, 4);
+				EEPROM_Write_Buffer((uint8_t *)&kd_roll, 4);
+				EEPROM_Write_Buffer((uint8_t *)&kp_yaw, 4);
+				EEPROM_Write_Buffer((uint8_t *)&ki_yaw, 4);
+				EEPROM_Write_Buffer((uint8_t *)&kd_yaw, 4);
+				EEPROM_Save_Page(0);
+
+				ClearManualBuffer();
 				manual_packet_buffer[manual_packet_count].width = 1;
+				manual_packet_buffer[manual_packet_count].reliable = 1;
 				AddIDToManualBuffer(PID_GAIN_FIRST_PACKET);
-				AddToManualBuffer(&kp_roll, 4);
-				AddToManualBuffer(&ki_roll, 4);
-				AddToManualBuffer(&kd_roll, 4);
-				AddToManualBuffer(&kp_yaw, 4);
-				AddToManualBuffer(&ki_yaw, 4);
-				AddToManualBuffer(&kd_yaw, 4);
+				AddToManualBuffer((uint8_t *)&kp_roll, 4);
+				AddToManualBuffer((uint8_t *)&ki_roll, 4);
+				AddToManualBuffer((uint8_t *)&kd_roll, 4);
+				AddToManualBuffer((uint8_t *)&kp_yaw, 4);
+				AddToManualBuffer((uint8_t *)&ki_yaw, 4);
+				AddToManualBuffer((uint8_t *)&kd_yaw, 4);
 
 				if(manual_packet_count < 31)
 					manual_packet_count++;
@@ -176,7 +176,7 @@ void telem_loop()
 				}
 
 				telem_send_buffer[32] = manual_packet_buffer[0].width;
-				telem_send_buffer[33] = 0;//Unreliable
+				telem_send_buffer[33] = manual_packet_buffer[0].reliable;//Unreliable
 				telem_send_buffer[34] = 0;//No data
 			}
 			else
@@ -195,6 +195,7 @@ void telem_loop()
 				}
 
 				telem_send_buffer[32] = var_index;
+				telem_send_buffer[33] = auto_packet_buffer[auto_packet_counter].reliable;
 
 				auto_packet_counter++;
 
@@ -250,6 +251,37 @@ void telem_loop()
 			//HAL_I2C_Master_Transmit_DMA(&hi2c2, (uint8_t)(0x04 << 1), (uint8_t *)telem_send_buffer, 35);
 		}
 	}
+}
+
+void ClearManualBuffer()
+{
+	manual_packet_buffer[manual_packet_count].reliable = 0;
+	for(int i = 0; i < 35; i++)
+	{
+		manual_packet_buffer[manual_packet_count].payload[i] = '\0';
+	}
+}
+
+void ClearPrintBuffer()
+{
+	for(int i = 0; i < 32; i++)
+	{
+		print_text_buffer[i] = '\0';
+	}
+}
+
+//Used to write text to console
+void PrintManualPacket()
+{
+	ClearManualBuffer();
+
+	sprintf((char*)(manual_packet_buffer[manual_packet_count].payload), "%s", print_text_buffer);//uint32_t
+	sprintf((char*)(manual_packet_buffer[manual_packet_count].payload), "%c%c%s", 0x09 , strlen((char*)(manual_packet_buffer[manual_packet_count].payload)), print_text_buffer);
+
+	manual_packet_buffer[manual_packet_count].width = strlen((char *)(manual_packet_buffer[manual_packet_count].payload));
+
+	if(manual_packet_count < 31)
+		manual_packet_count++;
 }
 
 void AddToAutoBuffer(uint8_t buf_index, uint8_t *num, uint8_t size)

@@ -1,1 +1,4 @@
-control_logic.c:27:6:Motor_PID	4	static
+control_logic.c:29:6:Motor_PID	4	static
+control_logic.c:110:6:Calculate_Motor_Outputs	16	static
+control_logic.c:160:6:Calculate_Altitude_PID	16	static
+control_logic.c:208:6:Control_Loop	8	static

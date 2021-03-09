@@ -36,6 +36,7 @@
 #include "imu.h"
 #include "control_logic.h"
 #include "eeprom.h"
+#include "bmp280.h"
 
 /* USER CODE END Includes */
 
@@ -70,17 +71,19 @@ uint8_t read_flag = 0;
 volatile uint32_t current_ppm_capture = 0, last_ppm_capture = 0;
 volatile uint32_t frequency_read = 1000;
 volatile uint8_t current_ppm_channel = 0;
-volatile uint32_t ppm_channels[7];//Channel - 1 because index 0 is channel 1
+volatile int32_t ppm_channels[6];//Channel - 1 because index 0 is channel 1
 volatile uint32_t millis_timer_base;
 
 volatile uint32_t test_max_frequency = 0;
 
 uint32_t pwm_output_timer, main_loop_timer;
 uint32_t how_long_to_loop_main;
-
+uint32_t main_cycle_counter = 0;
+float how_long_to_loop_modifier = 1;
 uint32_t temp_led_timer;
 
 uint8_t temp_test_text_buffer[35];
+uint32_t temp_control_loop_test_time = 500;
 
 /* USER CODE END PV */
 
@@ -146,15 +149,33 @@ int main(void)
 
   auto_packet_buffer[0].total_width = 0;
   auto_packet_buffer[0].var_count = 0;
-  auto_packet_buffer[0].id = 0x01;
-  AddToAutoBuffer(0, &(raw_gyro_acc_data[0]), 2);
-  AddToAutoBuffer(0, &(raw_gyro_acc_data[1]), 2);
-  AddToAutoBuffer(0, &(raw_gyro_acc_data[2]), 2);
-  AddToAutoBuffer(0, &gyro_x_angle, 4);
-  AddToAutoBuffer(0, &gyro_y_angle, 4);
-  AddToAutoBuffer(0, &gyro_z_angle, 4);
-  AddToAutoBuffer(0, &how_long_to_loop_main, 4);
-  AddToAutoBuffer(0, &(ppm_channels[2]), 4);
+  auto_packet_buffer[0].id = GYRO_PACKET;
+  auto_packet_buffer[0].send_rate = 1;
+  AddToAutoBuffer(0, (uint8_t *)&(raw_gyro_acc_data[0]), 2);
+  AddToAutoBuffer(0, (uint8_t *)&(raw_gyro_acc_data[1]), 2);
+  AddToAutoBuffer(0, (uint8_t *)&(raw_gyro_acc_data[2]), 2);
+  AddToAutoBuffer(0, (uint8_t *)&gyro_x_angle, 4);
+  AddToAutoBuffer(0, (uint8_t *)&gyro_y_angle, 4);
+  AddToAutoBuffer(0, (uint8_t *)&gyro_z_angle, 4);
+  AddToAutoBuffer(0, (uint8_t *)&how_long_to_loop_main, 4);
+  AddToAutoBuffer(0, (uint8_t *)&(ppm_channels[2]), 4);
+  auto_packet_count += 1;
+
+  auto_packet_buffer[1].total_width = 0;
+  auto_packet_buffer[1].var_count = 0;
+  auto_packet_buffer[1].id = PID_OUTPUT_PACKET;
+  auto_packet_buffer[1].send_rate = 1;
+  AddToAutoBuffer(1, (uint8_t *)&pid_roll_output, 4);
+  AddToAutoBuffer(1, (uint8_t *)&pid_pitch_output, 4);
+  AddToAutoBuffer(1, (uint8_t *)&pid_yaw_output, 4);
+  //AddToAutoBuffer(1, &pid_pitch_output, 4);
+  auto_packet_count += 1;
+
+  auto_packet_buffer[2].total_width = 0;
+  auto_packet_buffer[2].var_count = 0;
+  auto_packet_buffer[2].id = ALTITUDE_PACKET;
+  auto_packet_buffer[2].send_rate = 5;
+  AddToAutoBuffer(2, (uint8_t *)&calculated_bmp_altitude, 4);
   auto_packet_count += 1;
 
   for(int i = 0; i < 6; i++)
@@ -168,8 +189,44 @@ int main(void)
   }
 
   Setup_IMU();
+  Setup_BMP280();
+
+  //Motor PID Gains
+  EEPROM_Clear_Buffer();
+  EEPROM_Read_Page(0, 24);
+  eeprom_read_buffer_index = 0;
+  EEPROM_Read_Buffer((uint8_t *)&kp_roll, 4);
+  EEPROM_Read_Buffer((uint8_t *)&ki_roll, 4);
+  EEPROM_Read_Buffer((uint8_t *)&kd_roll, 4);
+  EEPROM_Read_Buffer((uint8_t *)&kp_yaw, 4);
+  EEPROM_Read_Buffer((uint8_t *)&ki_yaw, 4);
+  EEPROM_Read_Buffer((uint8_t *)&kd_yaw, 4);
 
   //CDC_Transmit_FS(buf, strlen((char*)buf));
+
+  //Calibrate_BMP280();
+  //Calibrate_IMU();
+
+  program_buffer[0] = 0x01;
+  program_buffer[1] = 0x01;
+  program_buffer[2] = 0x02;
+
+  for(int i = 0; i < 4; i++)
+  {
+	  program_buffer[3+i] = *(((uint8_t *)&temp_control_loop_test_time) + i);
+  }
+
+  program_buffer[7] = 0x01;
+  program_buffer[8] = 0x02;
+
+  program_buffer[9] = 0x02;
+
+  for(int i = 0; i < 4; i++)
+  {
+	  program_buffer[10+i] = *(((uint8_t *)&temp_control_loop_test_time) + i);
+  }
+
+  program_buffer[14] = 0x03;
 
   HAL_Delay(2000);
 
@@ -179,22 +236,33 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  Control_Loop();
+
 	  if(GetMillisDifference(&temp_led_timer) > 500)
 	  {
 		  temp_led_timer = GetMillis();
 
-		  HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+		  //HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 	  }
 
 	  if(GetMicrosDifference(&pwm_output_timer) >= 4000)
 	  {
 		  pwm_output_timer = GetMicros();
-		  __HAL_TIM_SET_COUNTER(&htim8, 4999); //Reset motor PWN counter for fast response time
+		  //__HAL_TIM_SET_COUNTER(&htim8, 4999); //Reset motor PWN counter for fast response time(probably makes esc refresh rate faster)
 	  }
 
 	  if(GetMicrosDifference(&main_loop_timer) >= 2000)
 	  {
+		  if(main_cycle_counter > 399)
+			  main_cycle_counter = 0;
+
+		  if(main_cycle_counter % 4 == 0)//Every 4 clock cycles(500uS * 4 = 2000uS) NOT IN USE RIGHT NOW
+		  {
+
+		  }
+
 		  how_long_to_loop_main = GetMicrosDifference(&main_loop_timer);
+		  how_long_to_loop_modifier = (float)(round(((float)((float)how_long_to_loop_main / 2000)) * 100.0) / 100.0);
 		  main_loop_timer = GetMicros();
 
 		  Read_IMU(0);
@@ -232,12 +300,26 @@ int main(void)
 			  gyro_z_angle += 360;
 		  if(gyro_z_angle >= 360)
 			  gyro_z_angle -= 360;
-	  }
 
-	  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_4, ppm_channels[2]);
-	  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, ppm_channels[2]);
-	  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, ppm_channels[2]);
-	  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, ppm_channels[2]);
+		  if(main_cycle_counter % 20)
+		  {
+			  Read_BMP280_PressureTemperature();
+			  Calculate_Altitude_PID();
+		  }
+
+		  //Calculate all motors values, then immediately output them using oneshot125
+		  Motor_PID();
+		  Calculate_Motor_Outputs();
+
+		  __HAL_TIM_SET_COUNTER(&htim8, 3999);
+
+		  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_4, esc1_output);
+		  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_3, esc2_output);
+		  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_2, esc3_output);
+		  __HAL_TIM_SET_COMPARE(&htim8, TIM_CHANNEL_1, esc4_output);
+
+		  main_cycle_counter++;
+	  }
 
 	  telem_loop();
 

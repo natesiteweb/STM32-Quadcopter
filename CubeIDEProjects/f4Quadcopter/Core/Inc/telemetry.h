@@ -38,6 +38,8 @@ typedef struct
 	uint8_t reliable;
 } data_packet;
 
+extern char print_text_buffer[32];
+
 extern volatile uint8_t telem_send_buffer[35];
 extern volatile uint8_t telem_receive_buffer[35];
 extern data_packet empty_data_packet;
@@ -66,7 +68,7 @@ enum
     PID_GAIN_SECOND_PACKET = 0x04,
     GPS_PACKET = 0x08,
     PRINT_PACKET = 0x09,
-    AUTO_PILOT_PACKET = 0xA0,
+    STATUS_FIRST_PACKET = 0x0A,
 
     PID_GAIN_FIRST_REQUEST = 0xF3,
     PID_GAIN_SECOND_REQUEST = 0xF4,

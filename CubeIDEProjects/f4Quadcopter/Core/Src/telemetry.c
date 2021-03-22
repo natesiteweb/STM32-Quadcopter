@@ -68,12 +68,15 @@ void telem_loop()
 			case 0x00:
 				break;
 			case CALIBRATE_GYRO_REQUEST:
-				Calibrate_BMP280();
-				Calibrate_IMU();
-				ClearManualBuffer();
-				ClearPrintBuffer();
-				sprintf((char *)print_text_buffer, "%s", "Gyro Calibrated.\n");
-				PrintManualPacket();
+				if(!launched)
+				{
+					Calibrate_BMP280();
+					Calibrate_IMU();
+					ClearManualBuffer();
+					ClearPrintBuffer();
+					sprintf((char *)print_text_buffer, "%s", "Gyro Calibrated.\n");
+					PrintManualPacket();
+				}
 				break;
 			case PID_GAIN_FIRST_REQUEST:
 				//HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);

@@ -1,4 +1,8 @@
-control_logic.c:29:6:Motor_PID	4	static
-control_logic.c:110:6:Calculate_Motor_Outputs	16	static
-control_logic.c:160:6:Calculate_Altitude_PID	16	static
-control_logic.c:208:6:Control_Loop	8	static
+control_logic.c:31:6:Calculate_Attitude	32	static
+control_logic.c:68:6:Motor_PID	4	static
+control_logic.c:149:6:Calculate_Motor_Outputs	16	static
+control_logic.c:199:6:Calculate_Altitude_PID	16	static
+control_logic.c:253:6:Control_Loop	8	static
+control_logic.c:305:6:Parse_Requested_State	24	static
+control_logic.c:341:6:Launch_Behavior	16	static
+control_logic.c:373:6:Land_Behavior	4	static

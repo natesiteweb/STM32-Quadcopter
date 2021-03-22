@@ -33,8 +33,8 @@ Core/Src/imu.o: ../Core/Src/imu.c ../Core/Inc/telemetry.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h \
- ../Core/Inc/main.h ../Core/Inc/i2c.h ../Core/Inc/main.h \
- ../Core/Inc/tim.h
+ ../Core/Inc/imu.h ../Core/Inc/main.h ../Core/Inc/i2c.h \
+ ../Core/Inc/main.h ../Core/Inc/tim.h
 
 ../Core/Inc/telemetry.h:
 
@@ -105,6 +105,8 @@ Core/Src/imu.o: ../Core/Src/imu.c ../Core/Inc/telemetry.h \
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h:
 
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h:
+
+../Core/Inc/imu.h:
 
 ../Core/Inc/main.h:
 

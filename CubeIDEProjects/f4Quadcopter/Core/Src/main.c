@@ -83,7 +83,17 @@ float how_long_to_loop_modifier = 1;
 uint32_t temp_led_timer;
 
 uint8_t temp_test_text_buffer[35];
-uint32_t temp_control_loop_test_time = 500;
+uint32_t temp_control_loop_test_time = 3000;
+
+uint8_t status_first = 0;
+
+int16_t last_x_value, last_y_value, last_z_value;
+int32_t x_deviation_sum = 10000, y_deviation_sum = 10000, z_deviation_sum = 10000;
+
+/*
+ * Control Boolean Variables
+ */
+uint8_t altitude_hold_flag = 0;
 
 /* USER CODE END PV */
 
@@ -159,6 +169,7 @@ int main(void)
   AddToAutoBuffer(0, (uint8_t *)&gyro_z_angle, 4);
   AddToAutoBuffer(0, (uint8_t *)&how_long_to_loop_main, 4);
   AddToAutoBuffer(0, (uint8_t *)&(ppm_channels[2]), 4);
+  AddToAutoBuffer(0, &status_first, 1);
   auto_packet_count += 1;
 
   auto_packet_buffer[1].total_width = 0;
@@ -182,6 +193,8 @@ int main(void)
   {
 	  ppm_channels[i] = 1000;
   }
+
+  ppm_channels[4] = 2000;
 
   for(int i = 0; i < 35; i++)
   {
@@ -226,9 +239,46 @@ int main(void)
 	  program_buffer[10+i] = *(((uint8_t *)&temp_control_loop_test_time) + i);
   }
 
-  program_buffer[14] = 0x03;
+  //program_buffer[14] = 0x03;//Restart Program
+  program_buffer[14] = 0x04;
 
   HAL_Delay(2000);
+
+  while(abs(x_deviation_sum) > 20 || abs(y_deviation_sum) > 20 || abs(z_deviation_sum) > 20)
+  {
+	  for(int i = 0; i < 200; i++)
+	  {
+		  if(i == 0)
+		  {
+			  x_deviation_sum = 0;
+			  y_deviation_sum = 0;
+			  z_deviation_sum = 0;
+		  }
+
+		  Read_IMU(0);
+
+		  x_deviation_sum += abs(raw_gyro_acc_data[0] - last_x_value);
+		  y_deviation_sum += abs(raw_gyro_acc_data[1] - last_y_value);
+		  z_deviation_sum += abs(raw_gyro_acc_data[2] - last_z_value);
+
+		  last_x_value = raw_gyro_acc_data[0];
+		  last_y_value = raw_gyro_acc_data[1];
+		  last_z_value = raw_gyro_acc_data[2];
+		  HAL_Delay(5);
+	  }
+
+	  x_deviation_sum /= 200;
+	  y_deviation_sum /= 200;
+	  z_deviation_sum /= 200;
+  }
+
+  Calibrate_BMP280();
+  Calibrate_IMU();
+  ClearManualBuffer();
+  ClearPrintBuffer();
+  sprintf((char *)print_text_buffer, "%s", "Gyro Calibrated.\n");
+  PrintManualPacket();
+
 
   /* USER CODE END 2 */
 
@@ -265,48 +315,45 @@ int main(void)
 		  how_long_to_loop_modifier = (float)(round(((float)((float)how_long_to_loop_main / 2000)) * 100.0) / 100.0);
 		  main_loop_timer = GetMicros();
 
-		  Read_IMU(0);
-
-		  gyro_x = (float)raw_gyro_acc_data[0] / 65.5;
-		  gyro_y = (float)raw_gyro_acc_data[1] / -65.5;
-		  gyro_z = (float)raw_gyro_acc_data[2] / -65.5;
-
-		  acc_magnitude = sqrt(((float)raw_gyro_acc_data[3] * (float)raw_gyro_acc_data[3]) + ((float)raw_gyro_acc_data[4] * (float)raw_gyro_acc_data[4]) + ((float)raw_gyro_acc_data[5] * (float)raw_gyro_acc_data[5]));
-
-		  if(acc_magnitude != 0)
+		  if(ppm_channels[4] > 1600)
 		  {
-			  if(abs(raw_gyro_acc_data[4]) < acc_magnitude)
-			  {
-				  acc_x = asin((float)raw_gyro_acc_data[4] / acc_magnitude) * 57.296;
-			  }
+			  manual_mode = 1;
+			  status_first |= 1 << 1;
 
-			  if(abs(raw_gyro_acc_data[3]) < acc_magnitude)
-			  {
-				  acc_y = asin((float)raw_gyro_acc_data[3] / acc_magnitude) * 57.296;
-			  }
+			  launched = 0;
+			  landing = 0;
+			  launching = 0;
+			  altitude_hold_flag = 0;
+		  }
+		  else
+		  {
+			  manual_mode = 0;
+			  status_first &= ~(1 << 1);
 		  }
 
-		  gyro_x_angle += (gyro_x) * ((float)how_long_to_loop_main / 1000000);
-		  gyro_y_angle += (gyro_y) * ((float)how_long_to_loop_main / 1000000);
-		  gyro_z_angle += (gyro_z) * ((float)how_long_to_loop_main / 1000000);
+		  status_first = ((status_first | 0x01) * launched) + ((status_first & ~(0x01)) * (launched ^ 0x01));
 
-		  gyro_x_angle += (gyro_y_angle * sin(gyro_z * 0.01745 * ((float)how_long_to_loop_main / 1000000)));
-		  gyro_y_angle -= (gyro_x_angle * sin(gyro_z * 0.01745 * ((float)how_long_to_loop_main / 1000000)));
+		  if(launching && !launched)
+		  {
+			  //Launch logic here
+			  Launch_Behavior();
+		  }
 
-		  gyro_x_angle = (gyro_x_angle * 0.9985) + (acc_x * (1.0000 - 0.9985));
-		  gyro_y_angle = (gyro_y_angle * 0.9985) + (acc_y * (1.0000 - 0.9985));
-
-		  if(gyro_z_angle < 0)
-			  gyro_z_angle += 360;
-		  if(gyro_z_angle >= 360)
-			  gyro_z_angle -= 360;
+		  if(landing && launched)
+		  {
+			  //Landing logic here
+			  Land_Behavior();
+		  }
 
 		  if(main_cycle_counter % 20)
 		  {
 			  Read_BMP280_PressureTemperature();
-			  Calculate_Altitude_PID();
+			  if(altitude_hold_flag)
+				  Calculate_Altitude_PID();
 		  }
 
+		  Read_IMU(0);
+		  Calculate_Attitude();
 		  //Calculate all motors values, then immediately output them using oneshot125
 		  Motor_PID();
 		  Calculate_Motor_Outputs();

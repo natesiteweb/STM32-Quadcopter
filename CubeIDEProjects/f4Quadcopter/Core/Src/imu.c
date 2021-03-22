@@ -6,6 +6,7 @@
  */
 
 #include "telemetry.h"
+#include "imu.h"
 #include "main.h"
 #include "i2c.h"
 #include "tim.h"
@@ -23,7 +24,7 @@ uint8_t raw_gyro_acc_buffer[14];
 int16_t raw_gyro_acc_data[6];//0:2 gyro xyz, 3:5 accel xyz
 int16_t raw_imu_temp;
 float gyro_x, gyro_y, gyro_z;
-float acc_magnitude, acc_x, acc_y, acc_z;
+float acc_magnitude, acc_x, acc_y, acc_z, acc_magnitude_at_start;
 float gyro_x_angle, gyro_y_angle, gyro_z_angle;
 float gyro_x_calibration, gyro_y_calibration, gyro_z_calibration;
 

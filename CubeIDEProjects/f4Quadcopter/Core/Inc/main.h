@@ -55,6 +55,8 @@ extern float how_long_to_loop_modifier;
 extern volatile int32_t ppm_channels[6];
 extern uint32_t main_loop_timer;
 
+extern uint8_t altitude_hold_flag;
+
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

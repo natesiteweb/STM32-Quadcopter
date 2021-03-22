@@ -1,3 +1,3 @@
-imu.c:30:6:Setup_IMU	16	static
-imu.c:61:6:Calibrate_IMU	16	static
-imu.c:81:6:Read_IMU	32	static
+imu.c:31:6:Setup_IMU	16	static
+imu.c:62:6:Calibrate_IMU	16	static
+imu.c:82:6:Read_IMU	32	static

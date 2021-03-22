@@ -146,20 +146,32 @@ void Motor_PID()
 		pid_yaw_output = (max_motor_pid_output * -1);
 }
 
+int32_t manual_throttle;
+int32_t throttle_output;
+
 void Calculate_Motor_Outputs()
 {
-	int32_t throttle_temp;
 	if(ppm_channels[2] < 1008)
-		throttle_temp = 125;
+		manual_throttle = 125;
 	else
-		throttle_temp = (ppm_channels[2] / 8);
+		manual_throttle = (ppm_channels[2] / 8);
 
-	if(ppm_channels[5] > 1300 && throttle_temp != 125)
+	throttle_output = idle_throttle;
+
+	if(altitude_hold_flag)
+		throttle_output += altitude_pid_output;
+
+	if(manual_mode)
 	{
-		esc1_output = throttle_temp + pid_roll_output + pid_pitch_output - pid_yaw_output;
-		esc2_output = throttle_temp - pid_roll_output + pid_pitch_output + pid_yaw_output;
-		esc3_output = throttle_temp - pid_roll_output - pid_pitch_output - pid_yaw_output;
-		esc4_output = throttle_temp + pid_roll_output - pid_pitch_output + pid_yaw_output;
+		throttle_output = manual_throttle;
+	}
+
+	if(ppm_channels[5] > 1300)
+	{
+		esc1_output = throttle_output + pid_roll_output + pid_pitch_output - pid_yaw_output;
+		esc2_output = throttle_output - pid_roll_output + pid_pitch_output + pid_yaw_output;
+		esc3_output = throttle_output - pid_roll_output - pid_pitch_output - pid_yaw_output;
+		esc4_output = throttle_output + pid_roll_output - pid_pitch_output + pid_yaw_output;
 	}
 	else
 	{
@@ -194,7 +206,11 @@ float slow_bmp_altitude = 0;
 
 float pid_altitude_setpoint = 2;
 
-float calculated_bmp_altitude = 0;
+float pid_alt_last_error = 0;
+int32_t altitude_pid_output;
+
+float kp_alt = 0, ki_alt = 0, kd_alt = 0;
+float pid_alt_i = 0;
 
 void Calculate_Altitude_PID()
 {
@@ -220,7 +236,20 @@ void Calculate_Altitude_PID()
 	if(bmp_reading_index == 4)
 		bmp_reading_index = 0;
 
-	//pid_error_temp =
+	pid_error_temp = pid_altitude_setpoint - slow_bmp_altitude;
+	pid_alt_i += ki_alt * pid_error_temp;
+
+	if(pid_alt_i > 100)
+		pid_alt_i = 100;
+	else if(pid_alt_i < -100)
+		pid_alt_i = -100;
+
+	altitude_pid_output = (pid_error_temp * kp_alt) + pid_alt_i + ((pid_error_temp - pid_alt_last_error) * kd_alt);
+
+	if(altitude_pid_output > 100)
+		altitude_pid_output = 100;
+	else if(altitude_pid_output < -100)
+		altitude_pid_output = -100;
 }
 
 typedef struct
@@ -267,39 +296,51 @@ void Control_Loop()
 		{
 			if(GetMillisDifference(&control_loop_wait_timer) >= control_loop_wait_time)
 			{
-				switch(program_buffer[program_counter])
-				{
-				case 0x00:	//No OP
-					program_counter++;
-					break;
-				case 0x01:	//Toggle LED: uint8_t
-					if(*(uint8_t *)&program_buffer[program_counter + 1] == 0x01)
-					{
-						HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-					}
-					else if(*(uint8_t *)&program_buffer[program_counter + 1] == 0x02)
-					{
-						HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-					}
-
-					program_counter += 2;
-					break;
-				case 0x02:	//Wait: uint32_t
-					control_loop_wait_timer = GetMillis();
-					control_loop_wait_time = *(uint32_t *)&program_buffer[program_counter + 1];
-					program_counter += 5;
-					break;
-				case 0x03:	//Restart program
+				uint8_t increment_index = Parse_Command((uint8_t *)&program_buffer, program_counter);
+				if(increment_index == 0)
 					program_counter = 0;
-					break;
-				case 0x04:	//Launch TEST
-					Parse_Requested_State(LAUNCHED);
-					program_counter++;
-					break;
-				}
+				else program_counter += increment_index;
 			}
 		}
 	}
+}
+
+uint8_t Parse_Command(uint8_t *cmd_array, uint8_t cmd_index)
+{
+	uint8_t output_index = 0;
+
+	switch(*cmd_array[cmd_index])
+	{
+	case 0x00:	//No OP
+		output_index++;
+		break;
+	case 0x01:	//Toggle LED: uint8_t
+		if(*(uint8_t *)cmd_array[cmd_index + 1] == 0x01)
+		{
+			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+		}
+		else if(*(uint8_t *)cmd_array[cmd_index + 1] == 0x02)
+		{
+			HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
+		}
+
+		output_index += 2;
+		break;
+	case 0x02:	//Wait: uint32_t
+		control_loop_wait_timer = GetMillis();
+		control_loop_wait_time = *(uint32_t *)cmd_array[cmd_index + 1];
+		output_index += 5;
+		break;
+	case 0x03:	//Restart program
+		output_index = 0;
+		break;
+	case 0x04:	//Launch TEST
+		Parse_Requested_State(LAUNCHED);
+		output_index++;
+		break;
+	}
+
+	return output_index;
 }
 
 void Parse_Requested_State(int32_t requested_state)
@@ -335,6 +376,7 @@ void Parse_Requested_State(int32_t requested_state)
 
 float z_acc_fast[30], z_acc_slow[30], z_acc_fast_total, z_acc_slow_total;
 float hover_throttle = 125;
+int32_t idle_throttle = 125;
 uint8_t z_acc_fast_reading_index = 0, z_acc_slow_reading_index = 0;
 uint32_t launch_timer;
 
@@ -361,10 +403,12 @@ void Launch_Behavior()
 			launched = 1;
 			launching = 0;
 			landing = 0;
+			idle_throttle = (int32_t)hover_throttle;
+			ready_for_next_command = 1;
 
 			ClearManualBuffer();
 			ClearPrintBuffer();
-			sprintf((char *)print_text_buffer, "%s%lu%s", "Launched: ", (uint32_t)hover_throttle, "\n");
+			sprintf((char *)print_text_buffer, "%s%ld%s", "Launched: ", idle_throttle, "\n");
 			PrintManualPacket();
 		}
 	}

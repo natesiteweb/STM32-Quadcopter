@@ -215,6 +215,14 @@ int main(void)
   EEPROM_Read_Buffer((uint8_t *)&ki_yaw, 4);
   EEPROM_Read_Buffer((uint8_t *)&kd_yaw, 4);
 
+  //Altitude PID Gains
+  EEPROM_Clear_Buffer();
+  EEPROM_Read_Page(32, 12);
+  eeprom_read_buffer_index = 0;
+  EEPROM_Read_Buffer((uint8_t *)&kp_alt, 4);
+  EEPROM_Read_Buffer((uint8_t *)&ki_alt, 4);
+  EEPROM_Read_Buffer((uint8_t *)&kd_alt, 4);
+
   //CDC_Transmit_FS(buf, strlen((char*)buf));
 
   //Calibrate_BMP280();
@@ -350,6 +358,12 @@ int main(void)
 			  Read_BMP280_PressureTemperature();
 			  if(altitude_hold_flag)
 				  Calculate_Altitude_PID();
+			  else
+			  {
+				  altitude_pid_output = 0;
+				  pid_alt_last_error = 0;
+				  pid_alt_i = 0;
+			  }
 		  }
 
 		  Read_IMU(0);

@@ -79,7 +79,6 @@ void telem_loop()
 				}
 				break;
 			case PID_GAIN_FIRST_REQUEST:
-				//HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 				ClearManualBuffer();
 				manual_packet_buffer[manual_packet_count].width = 1;
 				manual_packet_buffer[manual_packet_count].reliable = 1;
@@ -90,6 +89,18 @@ void telem_loop()
 				AddToManualBuffer((uint8_t *)&kp_yaw, 4);
 				AddToManualBuffer((uint8_t *)&ki_yaw, 4);
 				AddToManualBuffer((uint8_t *)&kd_yaw, 4);
+
+				if(manual_packet_count < 31)
+					manual_packet_count++;
+				break;
+			case PID_GAIN_SECOND_REQUEST:
+				ClearManualBuffer();
+				manual_packet_buffer[manual_packet_count].width = 1;
+				manual_packet_buffer[manual_packet_count].reliable = 1;
+				AddIDToManualBuffer(PID_GAIN_SECOND_PACKET);
+				AddToManualBuffer((uint8_t *)&kp_alt, 4);
+				AddToManualBuffer((uint8_t *)&ki_alt, 4);
+				AddToManualBuffer((uint8_t *)&kd_alt, 4);
 
 				if(manual_packet_count < 31)
 					manual_packet_count++;
@@ -123,6 +134,30 @@ void telem_loop()
 				AddToManualBuffer((uint8_t *)&kp_yaw, 4);
 				AddToManualBuffer((uint8_t *)&ki_yaw, 4);
 				AddToManualBuffer((uint8_t *)&kd_yaw, 4);
+
+				if(manual_packet_count < 31)
+					manual_packet_count++;
+				break;
+			case PID_GAIN_SECOND_UPDATE_REQUEST:
+				telem_receive_read_index = 1;
+				ReadReceiveBuffer((uint8_t *)&kp_alt, 4);
+				ReadReceiveBuffer((uint8_t *)&ki_alt, 4);
+				ReadReceiveBuffer((uint8_t *)&kd_alt, 4);
+
+				EEPROM_Clear_Buffer();
+				eeprom_write_buffer_width = 2;
+				EEPROM_Write_Buffer((uint8_t *)&kp_alt, 4);
+				EEPROM_Write_Buffer((uint8_t *)&ki_alt, 4);
+				EEPROM_Write_Buffer((uint8_t *)&kd_alt, 4);
+				EEPROM_Save_Page(32);
+
+				ClearManualBuffer();
+				manual_packet_buffer[manual_packet_count].width = 1;
+				manual_packet_buffer[manual_packet_count].reliable = 1;
+				AddIDToManualBuffer(PID_GAIN_SECOND_PACKET);
+				AddToManualBuffer((uint8_t *)&kp_alt, 4);
+				AddToManualBuffer((uint8_t *)&ki_alt, 4);
+				AddToManualBuffer((uint8_t *)&kd_alt, 4);
 
 				if(manual_packet_count < 31)
 					manual_packet_count++;

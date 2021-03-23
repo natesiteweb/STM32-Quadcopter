@@ -186,7 +186,7 @@ int main(void)
   auto_packet_buffer[2].var_count = 0;
   auto_packet_buffer[2].id = ALTITUDE_PACKET;
   auto_packet_buffer[2].send_rate = 5;
-  AddToAutoBuffer(2, (uint8_t *)&calculated_bmp_altitude, 4);
+  AddToAutoBuffer(2, (uint8_t *)&slow_bmp_altitude, 4);
   auto_packet_count += 1;
 
   for(int i = 0; i < 6; i++)
@@ -294,7 +294,25 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  Control_Loop();
+	  if(ppm_channels[4] < 1600)
+	  {
+		  manual_mode = 1;
+		  status_first |= 1 << 1;
+
+		  launched = 0;
+		  landing = 0;
+		  launching = 0;
+		  altitude_hold_flag = 0;
+	  }
+	  else
+	  {
+		  manual_mode = 0;
+		  status_first &= ~(1 << 1);
+
+		  Control_Loop();
+	  }
+
+	  status_first = ((status_first | 0x01) * launched) + ((status_first & ~(0x01)) * (launched ^ 0x01));
 
 	  if(GetMillisDifference(&temp_led_timer) > 500)
 	  {
@@ -322,24 +340,6 @@ int main(void)
 		  how_long_to_loop_main = GetMicrosDifference(&main_loop_timer);
 		  how_long_to_loop_modifier = (float)(round(((float)((float)how_long_to_loop_main / 2000)) * 100.0) / 100.0);
 		  main_loop_timer = GetMicros();
-
-		  if(ppm_channels[4] > 1600)
-		  {
-			  manual_mode = 1;
-			  status_first |= 1 << 1;
-
-			  launched = 0;
-			  landing = 0;
-			  launching = 0;
-			  altitude_hold_flag = 0;
-		  }
-		  else
-		  {
-			  manual_mode = 0;
-			  status_first &= ~(1 << 1);
-		  }
-
-		  status_first = ((status_first | 0x01) * launched) + ((status_first & ~(0x01)) * (launched ^ 0x01));
 
 		  if(launching && !launched)
 		  {

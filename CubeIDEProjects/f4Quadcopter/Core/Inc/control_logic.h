@@ -15,7 +15,7 @@ void Motor_PID(void);
 void Calculate_Motor_Outputs(void);
 void Calculate_Altitude_PID(void);
 void Control_Loop(void);
-uint8_t Parse_Command(uint8_t *cmd_array, uint8_t cmd_index);
+uint16_t Parse_Command(uint8_t *cmd_array, uint16_t cmd_index);
 void Parse_Requested_State(int32_t requested_state);
 void Launch_Behavior(void);
 void Land_Behavior(void);
@@ -39,6 +39,7 @@ extern float hover_throttle;
 extern int32_t idle_throttle;
 extern uint32_t launch_timer;
 
+extern float slow_bmp_altitude;
 extern float pid_altitude_setpoint;
 extern float pid_alt_last_error;
 extern int32_t altitude_pid_output;

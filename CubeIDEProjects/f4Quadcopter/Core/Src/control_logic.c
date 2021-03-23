@@ -281,45 +281,36 @@ uint8_t manual_mode = 0;
 
 void Control_Loop()
 {
-	if(manual_mode)//Overrides all; manual stick movement with transmitter
+	if(landing)
 	{
 
 	}
-	else
+
+	if(program_counter < 512 && ready_for_next_command)
 	{
-		if(landing)
+		if(GetMillisDifference(&control_loop_wait_timer) >= control_loop_wait_time)
 		{
-
-		}
-
-		if(program_counter < 512 && ready_for_next_command)
-		{
-			if(GetMillisDifference(&control_loop_wait_timer) >= control_loop_wait_time)
-			{
-				uint8_t increment_index = Parse_Command((uint8_t *)&program_buffer, program_counter);
-				if(increment_index == 0)
-					program_counter = 0;
-				else program_counter += increment_index;
-			}
+			uint16_t increment_index = Parse_Command((uint8_t *)&program_buffer, program_counter);
+			program_counter = increment_index;
 		}
 	}
 }
 
-uint8_t Parse_Command(uint8_t *cmd_array, uint8_t cmd_index)
+uint16_t Parse_Command(uint8_t *cmd_array, uint16_t cmd_index)
 {
-	uint8_t output_index = 0;
+	uint16_t output_index = cmd_index;
 
-	switch(*cmd_array[cmd_index])
+	switch(cmd_array[cmd_index])
 	{
 	case 0x00:	//No OP
 		output_index++;
 		break;
 	case 0x01:	//Toggle LED: uint8_t
-		if(*(uint8_t *)cmd_array[cmd_index + 1] == 0x01)
+		if(cmd_array[cmd_index + 1] == 0x01)
 		{
 			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
 		}
-		else if(*(uint8_t *)cmd_array[cmd_index + 1] == 0x02)
+		else if(cmd_array[cmd_index + 1] == 0x02)
 		{
 			HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
 		}
@@ -328,7 +319,7 @@ uint8_t Parse_Command(uint8_t *cmd_array, uint8_t cmd_index)
 		break;
 	case 0x02:	//Wait: uint32_t
 		control_loop_wait_timer = GetMillis();
-		control_loop_wait_time = *(uint32_t *)cmd_array[cmd_index + 1];
+		control_loop_wait_time = *((uint32_t *)&cmd_array[cmd_index + 1]);
 		output_index += 5;
 		break;
 	case 0x03:	//Restart program
@@ -353,7 +344,7 @@ void Parse_Requested_State(int32_t requested_state)
 			landing = 1;
 			ready_for_next_command = 0;
 		}
-		else
+		else if(!launched)
 			ready_for_next_command = 1;
 		break;
 	case LAUNCHED:
@@ -368,7 +359,7 @@ void Parse_Requested_State(int32_t requested_state)
 			sprintf((char *)print_text_buffer, "%s", "Launching.\n");
 			PrintManualPacket();
 		}
-		else
+		else if(launched)
 			ready_for_next_command = 1;
 		break;
 	}
@@ -405,6 +396,7 @@ void Launch_Behavior()
 			landing = 0;
 			idle_throttle = (int32_t)hover_throttle;
 			ready_for_next_command = 1;
+			altitude_hold_flag = 1;
 
 			ClearManualBuffer();
 			ClearPrintBuffer();

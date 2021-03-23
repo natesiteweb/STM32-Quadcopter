@@ -37,9 +37,10 @@ uint8_t ack_rate = 10;//Every x ticks of the radio ask for data
 
 uint8_t transmit_fail_flag = 0;	//If transmission failed, reset everything and try again
 uint8_t receive_fail_flag = 0;
-volatile uint8_t waiting_to_rx = 0; 		//Waiting until we ask for receive
+volatile uint8_t waiting_to_rx = 0; 	//Waiting until we ask for receive
 volatile uint8_t rx_done = 0;			//Response received
 volatile uint8_t tx_done = 0;
+uint8_t last_tx_type = 0;				//1: auto packet, 2: manual packet
 
 uint32_t acks_per_second_timer;
 uint32_t acks_counted;
@@ -72,7 +73,6 @@ void telem_loop()
 				{
 					Calibrate_BMP280();
 					Calibrate_IMU();
-					ClearManualBuffer();
 					ClearPrintBuffer();
 					sprintf((char *)print_text_buffer, "%s", "Gyro Calibrated.\n");
 					PrintManualPacket();
@@ -162,6 +162,14 @@ void telem_loop()
 				if(manual_packet_count < 31)
 					manual_packet_count++;
 				break;
+			case DO_CMD_PACKET:
+				telem_receive_read_index = 1;
+				ReadReceiveBuffer(&high_priority_program_width, 1);
+				ReadReceiveBuffer((uint8_t *)&high_priority_program_buffer, high_priority_program_width);
+				high_priority_program_counter = 0;
+				break;
+			case UPLOAD_CMD_PACKET:
+				break;
 			}
 		}
 
@@ -169,7 +177,7 @@ void telem_loop()
 		{
 			tx_done = 0;
 
-			if(manual_packet_count > 0)
+			if(last_tx_type == 2 && manual_packet_count > 0)
 			{
 				for(int i = 0; i < manual_packet_count - 1; i++)
 				{
@@ -207,6 +215,7 @@ void telem_loop()
 
 			if(manual_packet_count > 0)
 			{
+				last_tx_type = 2;
 
 				for(int i = 0; i < manual_packet_buffer[0].width; i++)
 				{
@@ -219,6 +228,8 @@ void telem_loop()
 			}
 			else
 			{
+				last_tx_type = 1;
+
 				telem_send_buffer[0] = auto_packet_buffer[auto_packet_counter].id;
 				uint8_t var_index = 1;
 

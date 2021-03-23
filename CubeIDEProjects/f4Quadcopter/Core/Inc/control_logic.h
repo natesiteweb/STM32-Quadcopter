@@ -31,6 +31,10 @@ extern float calculated_bmp_altitude;
 
 extern uint8_t program_buffer[512];
 
+extern uint8_t high_priority_program_buffer[32];
+extern uint8_t high_priority_program_counter;
+extern uint8_t high_priority_program_width;
+
 extern uint8_t launched, launching, landing;
 extern uint8_t ready_for_next_command;
 extern uint8_t manual_mode;

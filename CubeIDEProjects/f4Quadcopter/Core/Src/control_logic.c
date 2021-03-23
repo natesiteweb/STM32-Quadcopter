@@ -172,6 +172,26 @@ void Calculate_Motor_Outputs()
 		esc2_output = throttle_output - pid_roll_output + pid_pitch_output + pid_yaw_output;
 		esc3_output = throttle_output - pid_roll_output - pid_pitch_output - pid_yaw_output;
 		esc4_output = throttle_output + pid_roll_output - pid_pitch_output + pid_yaw_output;
+
+		if(esc1_output > 250)
+			esc1_output = 250;
+		else if(esc1_output < 125)
+			esc1_output = 125;
+
+		if(esc2_output > 250)
+			esc2_output = 250;
+		else if(esc2_output < 125)
+			esc2_output = 125;
+
+		if(esc3_output > 250)
+			esc3_output = 250;
+		else if(esc3_output < 125)
+			esc3_output = 125;
+
+		if(esc4_output > 250)
+			esc4_output = 250;
+		else if(esc4_output < 125)
+			esc4_output = 125;
 	}
 	else
 	{
@@ -246,10 +266,10 @@ void Calculate_Altitude_PID()
 
 	altitude_pid_output = (pid_error_temp * kp_alt) + pid_alt_i + ((pid_error_temp - pid_alt_last_error) * kd_alt);
 
-	if(altitude_pid_output > 100)
-		altitude_pid_output = 100;
-	else if(altitude_pid_output < -100)
-		altitude_pid_output = -100;
+	if(altitude_pid_output > 110)
+		altitude_pid_output = 110;
+	else if(altitude_pid_output < -110)
+		altitude_pid_output = -110;
 }
 
 typedef struct
@@ -267,38 +287,50 @@ typedef struct
 
 control_register_struct control_registers;
 
-uint8_t program_memory_buffer[512];
-uint8_t program_buffer[512];
+uint8_t *direct_var_access_buffer[256];		//Used to access permanent variables(altitude, launch state, etc.)
+uint8_t program_memory_buffer[512];			//Virtual memory buffer for storing program variables
+uint8_t program_buffer[512];				//Program
 uint16_t program_counter = 0;
+
+uint8_t high_priority_program_buffer[32];	//Direct command messages from telemetry
+uint8_t high_priority_program_counter = 0;
+uint8_t high_priority_program_width = 0;
 
 uint32_t control_loop_wait_timer;
 uint32_t control_loop_wait_time = 0;
 
+uint32_t high_priority_control_loop_wait_timer;
+uint32_t high_priority_control_loop_wait_time = 0;
+
 int32_t desired_flight_mode;
 uint8_t launched = 0, launching = 0, landing = 0;
-uint8_t ready_for_next_command = 1;
+uint8_t ready_for_next_command = 1, ready_for_next_command_high_priority = 1;
 uint8_t manual_mode = 0;
 
 void Control_Loop()
 {
-	if(landing)
+	if(high_priority_program_width > 0 && ready_for_next_command_high_priority)
 	{
-
+		if(GetMillisDifference(&high_priority_control_loop_wait_timer) >= high_priority_control_loop_wait_time)
+		{
+			uint16_t increment_index = Parse_Command((uint8_t *)&high_priority_program_buffer, high_priority_program_counter, 1);
+			high_priority_program_width -= increment_index;
+			high_priority_program_counter += increment_index;
+		}
 	}
-
-	if(program_counter < 512 && ready_for_next_command)
+	else if(program_counter < 512 && ready_for_next_command)
 	{
 		if(GetMillisDifference(&control_loop_wait_timer) >= control_loop_wait_time)
 		{
-			uint16_t increment_index = Parse_Command((uint8_t *)&program_buffer, program_counter);
-			program_counter = increment_index;
+			uint16_t increment_index = Parse_Command((uint8_t *)&program_buffer, program_counter, 0);
+			program_counter += increment_index;
 		}
 	}
 }
 
-uint16_t Parse_Command(uint8_t *cmd_array, uint16_t cmd_index)
+uint16_t Parse_Command(uint8_t *cmd_array, uint16_t cmd_index, uint8_t high_priority)
 {
-	uint16_t output_index = cmd_index;
+	uint16_t output_index = 0;
 
 	switch(cmd_array[cmd_index])
 	{
@@ -318,15 +350,27 @@ uint16_t Parse_Command(uint8_t *cmd_array, uint16_t cmd_index)
 		output_index += 2;
 		break;
 	case 0x02:	//Wait: uint32_t
-		control_loop_wait_timer = GetMillis();
-		control_loop_wait_time = *((uint32_t *)&cmd_array[cmd_index + 1]);
+		if(high_priority)
+		{
+			high_priority_control_loop_wait_timer = GetMillis();
+			high_priority_control_loop_wait_time = *((uint32_t *)&cmd_array[cmd_index + 1]);
+		}
+		else
+		{
+			control_loop_wait_timer = GetMillis();
+			control_loop_wait_time = *((uint32_t *)&cmd_array[cmd_index + 1]);
+		}
 		output_index += 5;
 		break;
 	case 0x03:	//Restart program
 		output_index = 0;
 		break;
-	case 0x04:	//Launch TEST
+	case 0x04:	//Launch
 		Parse_Requested_State(LAUNCHED);
+		output_index++;
+		break;
+	case 0x05:	//Land
+		Parse_Requested_State(LANDED);
 		output_index++;
 		break;
 	}
@@ -343,9 +387,12 @@ void Parse_Requested_State(int32_t requested_state)
 		{
 			landing = 1;
 			ready_for_next_command = 0;
+			ready_for_next_command_high_priority = 0;
+			launch_timer = GetMillis();
+			ClearPrintBuffer();
+			sprintf((char *)print_text_buffer, "%s", "Landing...\n");
+			PrintManualPacket();
 		}
-		else if(!launched)
-			ready_for_next_command = 1;
 		break;
 	case LAUNCHED:
 		if(!launched && !launching)
@@ -353,14 +400,12 @@ void Parse_Requested_State(int32_t requested_state)
 			launching = 1;
 			acc_magnitude_at_start = acc_magnitude;
 			ready_for_next_command = 0;
+			ready_for_next_command_high_priority = 0;
 			launch_timer = GetMillis();
-			ClearManualBuffer();
 			ClearPrintBuffer();
-			sprintf((char *)print_text_buffer, "%s", "Launching.\n");
+			sprintf((char *)print_text_buffer, "%s", "Launching...\n");
 			PrintManualPacket();
 		}
-		else if(launched)
-			ready_for_next_command = 1;
 		break;
 	}
 }
@@ -387,6 +432,7 @@ void Launch_Behavior()
 	if(GetMillisDifference(&launch_timer) >= 1000)
 	{
 		hover_throttle += 0.0625;
+		idle_throttle = (int32_t)hover_throttle;
 
 		if((z_acc_fast_total / 25) - acc_magnitude_at_start > 350)
 		{
@@ -394,11 +440,11 @@ void Launch_Behavior()
 			launched = 1;
 			launching = 0;
 			landing = 0;
-			idle_throttle = (int32_t)hover_throttle;
+
 			ready_for_next_command = 1;
+			ready_for_next_command_high_priority = 1;
 			altitude_hold_flag = 1;
 
-			ClearManualBuffer();
 			ClearPrintBuffer();
 			sprintf((char *)print_text_buffer, "%s%ld%s", "Launched: ", idle_throttle, "\n");
 			PrintManualPacket();
@@ -408,5 +454,37 @@ void Launch_Behavior()
 
 void Land_Behavior()
 {
+	z_acc_fast_total -= z_acc_fast[z_acc_fast_reading_index];
+	z_acc_fast[z_acc_fast_reading_index] = acc_magnitude;
+	z_acc_fast_total += z_acc_fast[z_acc_fast_reading_index];
 
+	z_acc_fast_reading_index++;
+
+	if(z_acc_fast_reading_index == 25)
+	{
+		z_acc_fast_reading_index = 0;
+	}
+
+	if(GetMillisDifference(&launch_timer) >= 1000)
+	{
+		pid_altitude_setpoint -= 0.003;
+
+		if((z_acc_fast_total / 25) > 370)
+		{
+			//Landed
+			launched = 0;
+			launching = 0;
+			landing = 0;
+
+			hover_throttle = 125;
+			idle_throttle = 125;
+			altitude_hold_flag = 0;
+			ready_for_next_command = 1;
+			ready_for_next_command_high_priority = 1;
+
+			ClearPrintBuffer();
+			sprintf((char *)print_text_buffer, "%s", "Landed.\n");
+			PrintManualPacket();
+		}
+	}
 }

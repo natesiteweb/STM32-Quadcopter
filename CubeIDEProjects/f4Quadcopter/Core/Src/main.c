@@ -282,7 +282,6 @@ int main(void)
 
   Calibrate_BMP280();
   Calibrate_IMU();
-  ClearManualBuffer();
   ClearPrintBuffer();
   sprintf((char *)print_text_buffer, "%s", "Gyro Calibrated.\n");
   PrintManualPacket();

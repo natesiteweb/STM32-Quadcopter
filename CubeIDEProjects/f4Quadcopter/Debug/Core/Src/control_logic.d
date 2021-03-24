@@ -35,7 +35,8 @@ Core/Src/control_logic.o: ../Core/Src/control_logic.c \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_ll_usb.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_pcd_ex.h \
  ../Core/Inc/control_logic.h ../Core/Inc/main.h ../Core/Inc/gpio.h \
- ../Core/Inc/main.h ../Core/Inc/imu.h ../Core/Inc/bmp280.h
+ ../Core/Inc/main.h ../Core/Inc/imu.h ../Core/Inc/bmp280.h \
+ ../Core/Inc/compass.h
 
 ../Core/Inc/telemetry.h:
 
@@ -118,3 +119,5 @@ Core/Src/control_logic.o: ../Core/Src/control_logic.c \
 ../Core/Inc/imu.h:
 
 ../Core/Inc/bmp280.h:
+
+../Core/Inc/compass.h:

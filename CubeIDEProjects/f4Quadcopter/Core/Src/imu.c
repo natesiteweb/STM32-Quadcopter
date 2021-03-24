@@ -81,7 +81,7 @@ void Calibrate_IMU()
 
 void Read_IMU(uint8_t is_calibrating)
 {
-	HAL_I2C_Mem_Read(&hi2c1, GYRO_ADDR, 0x3B, I2C_MEMADD_SIZE_8BIT, (uint8_t *)raw_gyro_acc_buffer, 14, HAL_MAX_DELAY);//Implement failure logic later
+	HAL_I2C_Mem_Read(&hi2c1, GYRO_ADDR, 0x3B, I2C_MEMADD_SIZE_8BIT, (uint8_t *)&raw_gyro_acc_buffer, 14, HAL_MAX_DELAY);//Implement failure logic later
 	raw_gyro_acc_data[3] = (int16_t)((raw_gyro_acc_buffer[0] << 8) | (raw_gyro_acc_buffer[1]));	//Acc X
 	raw_gyro_acc_data[4] = (int16_t)((raw_gyro_acc_buffer[2] << 8) | (raw_gyro_acc_buffer[3]));	//Acc Y
 	raw_gyro_acc_data[5] = (int16_t)((raw_gyro_acc_buffer[4] << 8) | (raw_gyro_acc_buffer[5]));	//Acc Z

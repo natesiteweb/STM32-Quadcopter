@@ -15,7 +15,7 @@ void Motor_PID(void);
 void Calculate_Motor_Outputs(void);
 void Calculate_Altitude_PID(void);
 void Control_Loop(void);
-uint16_t Parse_Command(uint8_t *cmd_array, uint16_t cmd_index);
+uint16_t Parse_Command(uint8_t *cmd_array, uint16_t cmd_index, uint8_t high_priority);
 void Parse_Requested_State(int32_t requested_state);
 void Launch_Behavior(void);
 void Land_Behavior(void);

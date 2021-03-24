@@ -1,8 +1,8 @@
-telemetry.c:50:6:telem_loop	56	static
-telemetry.c:294:6:ClearManualBuffer	16	static
-telemetry.c:303:6:ClearPrintBuffer	16	static
-telemetry.c:312:6:PrintManualPacket	24	static
-telemetry.c:325:6:AddToAutoBuffer	16	static
-telemetry.c:333:6:AddIDToManualBuffer	16	static
-telemetry.c:338:6:AddToManualBuffer	24	static
-telemetry.c:348:6:ReadReceiveBuffer	24	static
+telemetry.c:52:6:telem_loop	56	static
+telemetry.c:309:6:ClearManualBuffer	16	static
+telemetry.c:318:6:ClearPrintBuffer	16	static
+telemetry.c:327:6:PrintManualPacket	24	static
+telemetry.c:340:6:AddToAutoBuffer	16	static
+telemetry.c:348:6:AddIDToManualBuffer	16	static
+telemetry.c:353:6:AddToManualBuffer	24	static
+telemetry.c:363:6:ReadReceiveBuffer	24	static

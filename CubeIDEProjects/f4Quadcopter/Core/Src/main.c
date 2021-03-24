@@ -37,6 +37,7 @@
 #include "control_logic.h"
 #include "eeprom.h"
 #include "bmp280.h"
+#include "compass.h"
 
 /* USER CODE END Includes */
 
@@ -166,7 +167,7 @@ int main(void)
   AddToAutoBuffer(0, (uint8_t *)&(raw_gyro_acc_data[2]), 2);
   AddToAutoBuffer(0, (uint8_t *)&gyro_x_angle, 4);
   AddToAutoBuffer(0, (uint8_t *)&gyro_y_angle, 4);
-  AddToAutoBuffer(0, (uint8_t *)&gyro_z_angle, 4);
+  AddToAutoBuffer(0, (uint8_t *)&compass_heading, 4);
   AddToAutoBuffer(0, (uint8_t *)&how_long_to_loop_main, 4);
   AddToAutoBuffer(0, (uint8_t *)&(ppm_channels[2]), 4);
   AddToAutoBuffer(0, &status_first, 1);
@@ -215,7 +216,7 @@ int main(void)
   EEPROM_Read_Buffer((uint8_t *)&ki_yaw, 4);
   EEPROM_Read_Buffer((uint8_t *)&kd_yaw, 4);
 
-  //Altitude PID Gains
+  //Altitude and GPS PID Gains
   EEPROM_Clear_Buffer();
   EEPROM_Read_Page(32, 12);
   eeprom_read_buffer_index = 0;
@@ -223,12 +224,25 @@ int main(void)
   EEPROM_Read_Buffer((uint8_t *)&ki_alt, 4);
   EEPROM_Read_Buffer((uint8_t *)&kd_alt, 4);
 
+  //Compass Calibration Values
+  EEPROM_Clear_Buffer();
+  EEPROM_Read_Page(64, 12);
+  eeprom_read_buffer_index = 0;
+  EEPROM_Read_Buffer((uint8_t *)&compass_x_min, 2);
+  EEPROM_Read_Buffer((uint8_t *)&compass_x_max, 2);
+  EEPROM_Read_Buffer((uint8_t *)&compass_y_min, 2);
+  EEPROM_Read_Buffer((uint8_t *)&compass_y_max, 2);
+  EEPROM_Read_Buffer((uint8_t *)&compass_z_min, 2);
+  EEPROM_Read_Buffer((uint8_t *)&compass_z_max, 2);
+
+  Setup_Compass();
+
   //CDC_Transmit_FS(buf, strlen((char*)buf));
 
   //Calibrate_BMP280();
   //Calibrate_IMU();
 
-  program_buffer[0] = 0x01;
+  /*program_buffer[0] = 0x01;
   program_buffer[1] = 0x01;
   program_buffer[2] = 0x02;
 
@@ -248,7 +262,7 @@ int main(void)
   }
 
   //program_buffer[14] = 0x03;//Restart Program
-  program_buffer[14] = 0x04;
+  program_buffer[14] = 0x04;*/
 
   HAL_Delay(2000);
 
@@ -337,6 +351,8 @@ int main(void)
 		  }
 
 		  how_long_to_loop_main = GetMicrosDifference(&main_loop_timer);
+		  if(how_long_to_loop_main > 4000)
+			  how_long_to_loop_main = 3000;
 		  how_long_to_loop_modifier = (float)(round(((float)((float)how_long_to_loop_main / 2000)) * 100.0) / 100.0);
 		  main_loop_timer = GetMicros();
 
@@ -354,6 +370,7 @@ int main(void)
 
 		  if(main_cycle_counter % 20)
 		  {
+			  Read_Compass();
 			  Read_BMP280_PressureTemperature();
 			  if(altitude_hold_flag)
 				  Calculate_Altitude_PID();

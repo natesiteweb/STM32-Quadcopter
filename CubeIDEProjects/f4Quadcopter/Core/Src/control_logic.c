@@ -15,6 +15,7 @@
 #include "stdlib.h"
 #include "math.h"
 #include "bmp280.h"
+#include "compass.h"
 
 float kp_roll = 0, kp_yaw = 0;
 float ki_roll = 0, ki_yaw = 0;
@@ -63,6 +64,11 @@ void Calculate_Attitude()
 		gyro_z_angle += 360;
 	if(gyro_z_angle >= 360)
 		gyro_z_angle -= 360;
+
+	CalculateHeadingDifference(gyro_z_angle, compass_heading);
+
+	if (heading_difference_return > 5 || heading_difference_return < -5)
+		gyro_z_angle = compass_heading;
 }
 
 void Motor_PID()
@@ -434,7 +440,7 @@ void Launch_Behavior()
 		hover_throttle += 0.0625;
 		idle_throttle = (int32_t)hover_throttle;
 
-		if((z_acc_fast_total / 25) - acc_magnitude_at_start > 350)
+		if((z_acc_fast_total / 25) - acc_magnitude_at_start > 600)
 		{
 			//Launched
 			launched = 1;
@@ -451,6 +457,8 @@ void Launch_Behavior()
 		}
 	}
 }
+
+float temp_max_acc = 0;
 
 void Land_Behavior()
 {
@@ -469,7 +477,12 @@ void Land_Behavior()
 	{
 		pid_altitude_setpoint -= 0.003;
 
-		if((z_acc_fast_total / 25) > 370)
+		if(abs((z_acc_fast_total / 25) - acc_magnitude_at_start) > temp_max_acc)
+		{
+			temp_max_acc = abs((z_acc_fast_total / 25) - acc_magnitude_at_start);
+		}
+
+		if((z_acc_fast_total / 25) - acc_magnitude_at_start > 4000)
 		{
 			//Landed
 			launched = 0;
@@ -483,6 +496,7 @@ void Land_Behavior()
 			ready_for_next_command_high_priority = 1;
 
 			ClearPrintBuffer();
+			//sprintf((char *)print_text_buffer, "%s%ld%s", "Landed: ", (int32_t)temp_max_acc, "\n");
 			sprintf((char *)print_text_buffer, "%s", "Landed.\n");
 			PrintManualPacket();
 		}

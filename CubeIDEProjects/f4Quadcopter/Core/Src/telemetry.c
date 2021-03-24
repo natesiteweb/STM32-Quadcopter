@@ -17,6 +17,7 @@
 #include "control_logic.h"
 #include "eeprom.h"
 #include "bmp280.h"
+#include "compass.h"
 
 uint32_t telem_min_transmit_timer;
 char print_text_buffer[32];
@@ -161,6 +162,9 @@ void telem_loop()
 
 				if(manual_packet_count < 31)
 					manual_packet_count++;
+				break;
+			case CALIBRATE_COMPASS_REQUEST:
+				Calibrate_Compass();
 				break;
 			case DO_CMD_PACKET:
 				telem_receive_read_index = 1;

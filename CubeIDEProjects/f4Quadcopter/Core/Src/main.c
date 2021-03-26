@@ -171,7 +171,7 @@ int main(void)
   AddToAutoBuffer(0, (uint8_t *)&how_long_to_loop_main, 4);
   AddToAutoBuffer(0, (uint8_t *)&(ppm_channels[2]), 4);
   AddToAutoBuffer(0, &status_first, 1);
-  auto_packet_count += 1;
+  auto_packet_count++;
 
   auto_packet_buffer[1].total_width = 0;
   auto_packet_buffer[1].var_count = 0;
@@ -179,16 +179,16 @@ int main(void)
   auto_packet_buffer[1].send_rate = 1;
   AddToAutoBuffer(1, (uint8_t *)&pid_roll_output, 4);
   AddToAutoBuffer(1, (uint8_t *)&pid_pitch_output, 4);
-  AddToAutoBuffer(1, (uint8_t *)&pid_yaw_output, 4);
+  AddToAutoBuffer(1, (uint8_t *)&altitude_pid_output, 4);
   //AddToAutoBuffer(1, &pid_pitch_output, 4);
-  auto_packet_count += 1;
+  auto_packet_count++;
 
   auto_packet_buffer[2].total_width = 0;
   auto_packet_buffer[2].var_count = 0;
   auto_packet_buffer[2].id = ALTITUDE_PACKET;
   auto_packet_buffer[2].send_rate = 5;
   AddToAutoBuffer(2, (uint8_t *)&slow_bmp_altitude, 4);
-  auto_packet_count += 1;
+  auto_packet_count++;
 
   for(int i = 0; i < 6; i++)
   {
@@ -316,6 +316,9 @@ int main(void)
 		  landing = 0;
 		  launching = 0;
 		  altitude_hold_flag = 0;
+
+		  hover_throttle = 125;
+		  idle_throttle = 125;
 	  }
 	  else
 	  {
@@ -345,7 +348,7 @@ int main(void)
 		  if(main_cycle_counter > 399)
 			  main_cycle_counter = 0;
 
-		  if(main_cycle_counter % 4 == 0)//Every 4 clock cycles(500uS * 4 = 2000uS) NOT IN USE RIGHT NOW
+		  if((main_cycle_counter + 1) % 4 == 0)//Every 4 clock cycles(500uS * 4 = 2000uS) NOT IN USE RIGHT NOW
 		  {
 
 		  }
@@ -368,7 +371,7 @@ int main(void)
 			  Land_Behavior();
 		  }
 
-		  if(main_cycle_counter % 20)
+		  if((main_cycle_counter + 1) % 10)
 		  {
 			  Read_Compass();
 			  Read_BMP280_PressureTemperature();

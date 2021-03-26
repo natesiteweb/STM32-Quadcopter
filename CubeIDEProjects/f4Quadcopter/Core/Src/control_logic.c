@@ -93,8 +93,8 @@ void Motor_PID()
 	else if(ppm_channels[3] < 1495)
 		pid_yaw_setpoint = ppm_channels[3] - 1495;
 
-	pid_roll_setpoint -= (gyro_x_angle * 10);
-	pid_pitch_setpoint -= (gyro_y_angle * 10);
+	pid_roll_setpoint -= (gyro_x_angle * 15);
+	pid_pitch_setpoint -= (gyro_y_angle * 15);
 
 	pid_roll_setpoint /= 3.0;
 	pid_pitch_setpoint /= 3.0;
@@ -230,13 +230,16 @@ float pressure_difference = 0;
 float fast_bmp_altitude = 0;
 float slow_bmp_altitude = 0;
 
-float pid_altitude_setpoint = 2;
+float pid_altitude_setpoint = 1.5;
 
 float pid_alt_last_error = 0;
-int32_t altitude_pid_output;
+int32_t altitude_pid_output = 0;
 
-float kp_alt = 0, ki_alt = 0, kd_alt = 0;
+float kp_alt = 0, kp_alt_actual = 0, ki_alt = 0, kd_alt = 0;
 float pid_alt_i = 0;
+
+float pid_altitude_over_time_total = 0, pid_altitude_over_time[10];
+uint8_t pid_altitude_over_time_reading_index = 0;
 
 void Calculate_Altitude_PID()
 {
@@ -265,12 +268,30 @@ void Calculate_Altitude_PID()
 	pid_error_temp = pid_altitude_setpoint - slow_bmp_altitude;
 	pid_alt_i += ki_alt * pid_error_temp;
 
-	if(pid_alt_i > 100)
-		pid_alt_i = 100;
-	else if(pid_alt_i < -100)
-		pid_alt_i = -100;
+	if (pid_error_temp > 1.60 || pid_error_temp < -1.60)
+	{
+		kp_alt_actual = kp_alt * 2.5;
+	}
+	else
+		kp_alt_actual = kp_alt;
 
-	altitude_pid_output = (pid_error_temp * kp_alt) + pid_alt_i + ((pid_error_temp - pid_alt_last_error) * kd_alt);
+	pid_altitude_over_time_total -= pid_altitude_over_time[pid_altitude_over_time_reading_index];
+	pid_altitude_over_time[pid_altitude_over_time_reading_index] = (pid_error_temp - pid_alt_last_error) * kd_alt;
+	pid_altitude_over_time_total += pid_altitude_over_time[pid_altitude_over_time_reading_index];
+
+	pid_altitude_over_time_reading_index++;
+
+	if(pid_altitude_over_time_reading_index == 10)
+		pid_altitude_over_time_reading_index = 0;
+
+	if(pid_alt_i > 50)
+		pid_alt_i = 50;
+	else if(pid_alt_i < -50)
+		pid_alt_i = -50;
+
+	altitude_pid_output = (pid_error_temp * kp_alt_actual) + pid_alt_i + pid_altitude_over_time_total;
+
+	pid_alt_last_error = pid_error_temp;
 
 	if(altitude_pid_output > 110)
 		altitude_pid_output = 110;
@@ -437,15 +458,17 @@ void Launch_Behavior()
 
 	if(GetMillisDifference(&launch_timer) >= 1000)
 	{
-		hover_throttle += 0.0625;
+		hover_throttle += 0.075;
 		idle_throttle = (int32_t)hover_throttle;
 
-		if((z_acc_fast_total / 25) - acc_magnitude_at_start > 600)
+		if((z_acc_fast_total / 25) - acc_magnitude_at_start > 700)
 		{
 			//Launched
 			launched = 1;
 			launching = 0;
 			landing = 0;
+
+			pid_altitude_setpoint = 1.5;
 
 			ready_for_next_command = 1;
 			ready_for_next_command_high_priority = 1;
@@ -475,7 +498,7 @@ void Land_Behavior()
 
 	if(GetMillisDifference(&launch_timer) >= 1000)
 	{
-		pid_altitude_setpoint -= 0.003;
+		pid_altitude_setpoint -= 0.002;
 
 		if(abs((z_acc_fast_total / 25) - acc_magnitude_at_start) > temp_max_acc)
 		{
@@ -488,6 +511,8 @@ void Land_Behavior()
 			launched = 0;
 			launching = 0;
 			landing = 0;
+
+			pid_altitude_setpoint = 1.5;
 
 			hover_throttle = 125;
 			idle_throttle = 125;

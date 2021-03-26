@@ -20,6 +20,13 @@ void Parse_Requested_State(int32_t requested_state);
 void Launch_Behavior(void);
 void Land_Behavior(void);
 
+typedef struct
+{
+	uint8_t *var;
+	uint8_t protected;
+} direct_access_var;
+
+
 extern int32_t pid_roll_output, pid_pitch_output, pid_yaw_output;
 extern float kp_roll, kp_yaw;
 extern float ki_roll, ki_yaw;
@@ -28,7 +35,10 @@ extern float kd_roll, kd_yaw;
 extern int32_t esc1_output, esc2_output, esc3_output, esc4_output;
 
 extern float calculated_bmp_altitude;
+extern float pid_current_altitude_setpoint;
+extern float pid_altitude_setpoint;
 
+extern direct_access_var direct_access_variables[256];
 extern uint8_t program_buffer[512];
 
 extern uint8_t high_priority_program_buffer[32];

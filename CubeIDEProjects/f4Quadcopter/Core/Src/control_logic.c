@@ -230,6 +230,7 @@ float pressure_difference = 0;
 float fast_bmp_altitude = 0;
 float slow_bmp_altitude = 0;
 
+float pid_current_altitude_setpoint = 1.5;
 float pid_altitude_setpoint = 1.5;
 
 float pid_alt_last_error = 0;
@@ -265,7 +266,7 @@ void Calculate_Altitude_PID()
 	if(bmp_reading_index == 4)
 		bmp_reading_index = 0;
 
-	pid_error_temp = pid_altitude_setpoint - slow_bmp_altitude;
+	pid_error_temp = pid_current_altitude_setpoint - slow_bmp_altitude;
 	pid_alt_i += ki_alt * pid_error_temp;
 
 	if (pid_error_temp > 1.60 || pid_error_temp < -1.60)
@@ -314,12 +315,12 @@ typedef struct
 
 control_register_struct control_registers;
 
-uint8_t *direct_var_access_buffer[256];		//Used to access permanent variables(altitude, launch state, etc.)
-uint8_t program_memory_buffer[512];			//Virtual memory buffer for storing program variables
-uint8_t program_buffer[512];				//Program
+direct_access_var direct_access_variables[256];		//Used to access permanent variables(altitude, launch state, etc.)
+uint8_t program_memory_buffer[512];					//Virtual memory buffer for storing program variables
+uint8_t program_buffer[512];						//Program
 uint16_t program_counter = 0;
 
-uint8_t high_priority_program_buffer[32];	//Direct command messages from telemetry
+uint8_t high_priority_program_buffer[32];			//Direct command messages from telemetry
 uint8_t high_priority_program_counter = 0;
 uint8_t high_priority_program_width = 0;
 
@@ -468,7 +469,7 @@ void Launch_Behavior()
 			launching = 0;
 			landing = 0;
 
-			pid_altitude_setpoint = 1.5;
+			pid_current_altitude_setpoint = 1.5;
 
 			ready_for_next_command = 1;
 			ready_for_next_command_high_priority = 1;
@@ -498,7 +499,7 @@ void Land_Behavior()
 
 	if(GetMillisDifference(&launch_timer) >= 1000)
 	{
-		pid_altitude_setpoint -= 0.002;
+		pid_current_altitude_setpoint -= 0.002;
 
 		if(abs((z_acc_fast_total / 25) - acc_magnitude_at_start) > temp_max_acc)
 		{
@@ -512,7 +513,7 @@ void Land_Behavior()
 			launching = 0;
 			landing = 0;
 
-			pid_altitude_setpoint = 1.5;
+			pid_current_altitude_setpoint = 1.5;
 
 			hover_throttle = 125;
 			idle_throttle = 125;

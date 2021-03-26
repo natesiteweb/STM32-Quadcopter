@@ -150,6 +150,16 @@ int main(void)
   MX_TIM9_Init();
   /* USER CODE BEGIN 2 */
 
+  direct_access_variables[0].var = (uint8_t *)&pid_altitude_setpoint;
+  direct_access_variables[0].protected = 0;
+
+  direct_access_variables[1].var = (uint8_t *)&pid_current_altitude_setpoint;
+  direct_access_variables[1].protected = 1;
+
+  direct_access_variables[2].var = (uint8_t *)&slow_bmp_altitude;
+  direct_access_variables[2].protected = 1;
+
+
   HAL_TIM_IC_Start_IT(&htim5, TIM_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim9);
   //HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);

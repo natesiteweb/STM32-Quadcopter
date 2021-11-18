@@ -35,6 +35,7 @@
 #include "math.h"
 #include "imu.h"
 #include "control_logic.h"
+#include "control_loop.h"
 #include "eeprom.h"
 #include "bmp280.h"
 #include "compass.h"
@@ -67,6 +68,8 @@ volatile uint32_t val;
 volatile uint32_t i2c_transmit_timer = 0;
 float gyro_x;
 
+uint32_t main_i2c_timeout_timer = 0;
+
 uint8_t read_flag = 0;
 
 volatile uint32_t current_ppm_capture = 0, last_ppm_capture = 0;
@@ -77,9 +80,10 @@ volatile uint32_t millis_timer_base;
 
 volatile uint32_t test_max_frequency = 0;
 
-uint32_t pwm_output_timer, main_loop_timer;
+uint32_t pwm_output_timer, main_loop_timer, gps_pid_timer;
 uint32_t how_long_to_loop_main;
 uint32_t main_cycle_counter = 0;
+uint32_t gps_pid_counter = 0;
 float how_long_to_loop_modifier = 1;
 uint32_t temp_led_timer;
 
@@ -95,6 +99,28 @@ int32_t x_deviation_sum = 10000, y_deviation_sum = 10000, z_deviation_sum = 1000
  * Control Boolean Variables
  */
 uint8_t altitude_hold_flag = 0;
+uint8_t gps_hold_flag = 0;
+uint8_t last_gps_hold_flag = 0;
+uint8_t gps_waypoint_flag = 0;
+uint8_t optical_flow_flag = 0;
+uint8_t new_camera_data = 0;
+
+uint32_t camera_request_timer = 0;
+uint8_t camera_receive_flag = 0;
+uint8_t camera_waiting_flag = 0;
+uint8_t camera_receive_buf[32];
+uint8_t camera_send_buf[32];
+float camera_displacement_x = 0;
+float camera_displacement_y = 0;
+float camera_velocity_x = 0;
+float camera_velocity_y = 0;
+int32_t camera_framerate = 0;
+
+int32_t raw_camera_x_velocity = 0;
+int32_t raw_camera_y_velocity = 0;
+
+int32_t last_camera_x_velocity = 0;
+int32_t last_camera_y_velocity = 0;
 
 /* USER CODE END PV */
 
@@ -152,13 +178,33 @@ int main(void)
 
   direct_access_variables[0].var = (uint8_t *)&pid_altitude_setpoint;
   direct_access_variables[0].protected = 0;
+  direct_access_variables[0].width = 4;
+  direct_access_variables[0].var_index = 0;
 
   direct_access_variables[1].var = (uint8_t *)&pid_current_altitude_setpoint;
   direct_access_variables[1].protected = 1;
+  direct_access_variables[1].width = 4;
+  direct_access_variables[1].var_index = 1;
 
   direct_access_variables[2].var = (uint8_t *)&slow_bmp_altitude;
   direct_access_variables[2].protected = 1;
+  direct_access_variables[2].width = 4;
+  direct_access_variables[2].var_index = 2;
 
+  direct_access_variables[3].var = (uint8_t *)&sat_count;
+  direct_access_variables[3].protected = 1;
+  direct_access_variables[3].width = 1;
+  direct_access_variables[3].var_index = 3;
+
+  direct_access_variables[4].var = (uint8_t *)&raw_gps_lat;
+  direct_access_variables[4].protected = 1;
+  direct_access_variables[4].width = 4;
+  direct_access_variables[4].var_index = 4;
+
+  direct_access_variables[5].var = (uint8_t *)&raw_gps_lon;
+  direct_access_variables[5].protected = 1;
+  direct_access_variables[5].width = 4;
+  direct_access_variables[5].var_index = 5;
 
   HAL_TIM_IC_Start_IT(&htim5, TIM_CHANNEL_1);
   HAL_TIM_Base_Start_IT(&htim9);
@@ -187,9 +233,9 @@ int main(void)
   auto_packet_buffer[1].var_count = 0;
   auto_packet_buffer[1].id = PID_OUTPUT_PACKET;
   auto_packet_buffer[1].send_rate = 1;
-  AddToAutoBuffer(1, (uint8_t *)&pid_roll_output, 4);
-  AddToAutoBuffer(1, (uint8_t *)&pid_pitch_output, 4);
-  AddToAutoBuffer(1, (uint8_t *)&altitude_pid_output, 4);
+  AddToAutoBuffer(1, (uint8_t *)&gps_roll_modifier_north, 4);	//pid_roll_output
+  AddToAutoBuffer(1, (uint8_t *)&camera_roll_modifier, 4);	//pid_pitch_output
+  AddToAutoBuffer(1, (uint8_t *)&camera_pitch_modifier, 4);
   //AddToAutoBuffer(1, &pid_pitch_output, 4);
   auto_packet_count++;
 
@@ -198,6 +244,8 @@ int main(void)
   auto_packet_buffer[2].id = ALTITUDE_PACKET;
   auto_packet_buffer[2].send_rate = 5;
   AddToAutoBuffer(2, (uint8_t *)&slow_bmp_altitude, 4);
+  AddToAutoBuffer(2, (uint8_t *)&(current_state[0]), 8);
+  AddToAutoBuffer(2, (uint8_t *)&(kalman_gain_matrix[0]), 8);
   auto_packet_count++;
 
   for(int i = 0; i < 6; i++)
@@ -210,6 +258,12 @@ int main(void)
   for(int i = 0; i < 35; i++)
   {
 	  empty_data_packet.payload[i] = '\0';
+  }
+
+  for(int i = 0; i < 32; i++)
+  {
+	  camera_receive_buf[i] = 0;
+	  camera_send_buf[i] = 0;
   }
 
   Setup_IMU();
@@ -228,11 +282,14 @@ int main(void)
 
   //Altitude and GPS PID Gains
   EEPROM_Clear_Buffer();
-  EEPROM_Read_Page(32, 12);
+  EEPROM_Read_Page(32, 24);
   eeprom_read_buffer_index = 0;
   EEPROM_Read_Buffer((uint8_t *)&kp_alt, 4);
   EEPROM_Read_Buffer((uint8_t *)&ki_alt, 4);
   EEPROM_Read_Buffer((uint8_t *)&kd_alt, 4);
+  EEPROM_Read_Buffer((uint8_t *)&kp_gps, 4);
+  EEPROM_Read_Buffer((uint8_t *)&ki_gps, 4);
+  EEPROM_Read_Buffer((uint8_t *)&kd_gps, 4);
 
   //Compass Calibration Values
   EEPROM_Clear_Buffer();
@@ -306,6 +363,7 @@ int main(void)
 
   Calibrate_BMP280();
   Calibrate_IMU();
+  Init_Altitude_Kalman();
   ClearPrintBuffer();
   sprintf((char *)print_text_buffer, "%s", "Gyro Calibrated.\n");
   PrintManualPacket();
@@ -326,6 +384,9 @@ int main(void)
 		  landing = 0;
 		  launching = 0;
 		  altitude_hold_flag = 0;
+		  gps_hold_flag = 0;
+		  last_gps_hold_flag = 0;
+		  gps_waypoint_flag = 0;
 
 		  hover_throttle = 125;
 		  idle_throttle = 125;
@@ -339,6 +400,29 @@ int main(void)
 	  }
 
 	  status_first = ((status_first | 0x01) * launched) + ((status_first & ~(0x01)) * (launched ^ 0x01));
+
+	  if(ppm_channels[5] > 1600)
+	  {
+		  optical_flow_flag = 1;
+		  gps_hold_flag = 0;
+	  }
+	  else
+	  {
+		  optical_flow_flag = 0;
+
+		  camera_displacement_x = 0;
+		  camera_displacement_y = 0;
+		  camera_roll_modifier = 0;
+		  camera_pitch_modifier = 0;
+		  last_camera_roll_error = 0;
+		  last_camera_pitch_error = 0;
+		  camera_velocity_x = 0;
+		  camera_velocity_y = 0;
+		  last_camera_x_velocity = 0;
+		  last_camera_y_velocity = 0;
+		  pid_camera_x_i = 0;
+		  pid_camera_y_i = 0;
+	  }
 
 	  if(GetMillisDifference(&temp_led_timer) > 500)
 	  {
@@ -358,10 +442,10 @@ int main(void)
 		  if(main_cycle_counter > 399)
 			  main_cycle_counter = 0;
 
-		  if((main_cycle_counter + 1) % 4 == 0)//Every 4 clock cycles(500uS * 4 = 2000uS) NOT IN USE RIGHT NOW
+		  /*if((main_cycle_counter + 1) % 4 == 0)//Every 4 clock cycles(500uS * 4 = 2000uS) NOT IN USE RIGHT NOW
 		  {
 
-		  }
+		  }*/
 
 		  how_long_to_loop_main = GetMicrosDifference(&main_loop_timer);
 		  if(how_long_to_loop_main > 4000)
@@ -381,14 +465,98 @@ int main(void)
 			  Land_Behavior();
 		  }
 
-		  if((main_cycle_counter + 1) % 10)
+		  if(new_camera_data)
+		  {
+			  new_camera_data = 0;
+
+			  if(optical_flow_flag)
+				  OpticalFlow_PID();
+		  }
+
+		  if(gps_hold_flag)
+		  {
+			  kp_gps_actual = kp_gps;
+
+			  if(!last_gps_hold_flag)
+			  {
+				  calculated_lat_error = 0;
+				  calculated_lon_error = 0;
+				  lat_add = 0;
+				  lon_add = 0;
+
+				  lat_error_over_time_total = 0;
+				  lon_error_over_time_total = 0;
+				  gps_error_over_time_reading_index = 0;
+
+				  last_calculated_lat_error = 0;
+				  last_calculated_lon_error = 0;
+
+				  gps_roll_modifier = 0;
+				  gps_pitch_modifier = 0;
+				  gps_roll_modifier_north = 0;
+				  gps_pitch_modifier_north = 0;
+
+				  for(int i = 0; i < 40; i++)
+				  {
+					  lat_error_over_time[i] = 0;
+					  lon_error_over_time[i] = 0;
+				  }
+			  }
+
+			  if((GetMicrosDifference(&gps_pid_timer) >= 10000 && gps_pid_counter < 19) || new_gps_data)
+			  {
+				  gps_pid_timer = GetMicros();
+
+				  if(!new_gps_data)
+				  {
+					  gps_pid_counter++;
+
+					  calculated_lat_error += lat_add;
+					  calculated_lon_error -= lon_add;
+				  }
+				  else
+				  {
+					  gps_pid_counter = 0;
+					  new_gps_data = 0;
+				  }
+
+				  GPS_PID();
+			  }
+		  }
+
+		  last_gps_hold_flag = gps_hold_flag;
+
+		  Calculate_Altitude_Filter();
+
+		  if((main_cycle_counter + 1) % 10 == 0)
 		  {
 			  Read_Compass();
 			  Read_BMP280_PressureTemperature();
+
 			  if(altitude_hold_flag)
+			  {
+				  if(pid_current_altitude_setpoint > pid_altitude_setpoint + 0.06)
+				  {
+					  pid_current_altitude_setpoint -= 0.01;	//1 m/s
+				  }
+				  else if(pid_current_altitude_setpoint < pid_altitude_setpoint - 0.06)
+				  {
+					  pid_current_altitude_setpoint += 0.01;	//1 m/s
+				  }
+				  //else
+					//  pid_current_altitude_setpoint = pid_altitude_setpoint;
+
 				  Calculate_Altitude_PID();
+			  }
 			  else
 			  {
+				  for(int i = 0; i < 20; i++)
+				  {
+					  pid_altitude_over_time[pid_altitude_over_time_reading_index] = 0;
+				  }
+
+				  pid_altitude_over_time_reading_index = 0;
+				  pid_altitude_over_time_total = 0;
 				  altitude_pid_output = 0;
 				  pid_alt_last_error = 0;
 				  pid_alt_i = 0;
@@ -397,6 +565,9 @@ int main(void)
 
 		  Read_IMU(0);
 		  Calculate_Attitude();
+		  //uint8_t test_temp_buf[32];
+		  //sprintf((char *)test_temp_buf, "%hd%s", raw_gyro_acc_data[0], "\n");
+		  //CDC_Transmit_FS(test_temp_buf, strlen((char *)test_temp_buf));
 		  //Calculate all motors values, then immediately output them using oneshot125
 		  Motor_PID();
 		  Calculate_Motor_Outputs();
@@ -590,6 +761,10 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
 	{
 		tx_done = 1;
 	}
+	else if(hi2c == &hi2c1)
+	{
+
+	}
 }
 
 void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
@@ -598,6 +773,10 @@ void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
 	{
 		rx_done = 1;
 		acks_counted++;
+	}
+	else if(hi2c == &hi2c1)
+	{
+		camera_receive_flag = 1;
 	}
 }
 
@@ -615,6 +794,52 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c)
 	if(hi2c == &hi2c2)
 	{
 	}
+	else if(hi2c == &hi2c1)
+	{
+		/*if((I2C1->SR1 & I2C_SR1_BERR) != 0)//Bus error
+		{
+			I2C1->SR1 &= ~(I2C_SR1_BERR);
+		}
+		else if((I2C1->SR1 & I2C_SR1_AF) != 0)//Ack fail
+		{
+			I2C1->SR1 &= ~(I2C_SR1_AF);
+		}*/
+	}
+}
+
+void ReadCamera()
+{
+	//HAL_I2C_Master_Transmit();
+    while(I2C1->SR2 & I2C_SR2_BUSY);
+    I2C1->CR1 |= I2C_CR1_START;
+    while(~I2C1->SR1 & I2C_SR1_SB);
+    I2C1->DR = 0x58;
+    while(~I2C1->SR1 & I2C_SR1_ADDR);
+    I2C1->SR2;       // Dummy read
+    for(int i = 0; i < 32; i++)
+    {
+    	I2C1->DR = camera_send_buf[i];  // Write the register number to be read
+    	while(~I2C1->SR1 & (I2C_SR1_TXE | I2C_SR1_BTF));
+    }
+
+    //I2C1->CR1 |= I2C_CR1_STOP;
+
+    // Read the register value
+    while(I2C1->SR2 & I2C_SR2_BUSY);
+    I2C1->CR1 |= I2C_CR1_START;
+    while(~I2C1->SR1 & I2C_SR1_SB);
+    I2C1->DR = 0x58 | 1;
+    while(~I2C1->SR1 & I2C_SR1_ADDR);
+    I2C1->SR2;       // Dummy read
+
+    for(int i = 0; i < 32; i++)
+    {
+    	while(~I2C1->SR1 & I2C_SR1_RXNE);
+    	camera_receive_buf[i] = I2C1->DR;
+    }
+    //while(~I2C1->SR1 & I2C_SR1_RXNE);
+    I2C1->CR1 |= I2C_CR1_STOP;
+    //uint8_t data = I2C1->DR;
 }
 
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)

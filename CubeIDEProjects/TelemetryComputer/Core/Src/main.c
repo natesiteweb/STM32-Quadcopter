@@ -20,7 +20,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
-#include "dma.h"
 #include "i2c.h"
 #include "spi.h"
 #include "tim.h"
@@ -31,6 +30,7 @@
 /* USER CODE BEGIN Includes */
 
 #include "nrf24radio.h"
+#include "gps.h"
 
 /* USER CODE END Includes */
 
@@ -117,7 +117,6 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_ADC1_Init();
   MX_I2C1_Init();
   MX_SPI2_Init();
@@ -132,6 +131,8 @@ int main(void)
   nrf_radio.cePinPort = NRF_CE_GPIO_Port;
   nrf_radio.csnPin = NRF_CSN_Pin;
   nrf_radio.cePin = NRF_CE_Pin;
+
+  GPS_Init();
 
   HAL_Delay(500);
 
@@ -275,6 +276,9 @@ int main(void)
 
 		  if(packets_to_receive_counter > 0)
 		  {
+			  if(packets_to_receive[0].payload[0] == 0xFD)
+				  waiting_for_gps_packet_sent = 0;
+
 			  for(int i = 0; i < packets_to_receive_counter - 1; i++)
 			  {
 				  packets_to_receive[i].width = packets_to_receive[i+1].width;
@@ -330,96 +334,7 @@ int main(void)
 		  }
 	  }
 
-	  if(i2c_receive_flag && 1 == 0)
-	  {
-		  i2c_receive_flag = 0;
-
-		  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
-		  //HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
-		  test_i2c_last_received = GetMillis();
-
-		  if(current_i2c_packet.payload[34])
-		  {
-			  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_7);
-			  //HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6);
-
-			  new_packet_to_send_available = 0;
-			  //while(HAL_I2C_GetState(&hi2c1) != HAL_I2C_STATE_READY)
-			  //HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, HAL_MAX_DELAY);
-			  //HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, 50);
-
-			  uint8_t max_retry_counter = 0;
-
-			  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_SET);
-			  while(HAL_I2C_GetState(&hi2c1) != HAL_I2C_STATE_READY && GetMillisDifference(&test_i2c_last_received) < 50);
-			  if(HAL_I2C_GetState(&hi2c1) == HAL_I2C_STATE_READY)
-				  HAL_I2C_Slave_Transmit_IT(&hi2c1, (uint8_t *)empty_data_packet.payload, 34);
-			  HAL_GPIO_WritePin(LED2_GPIO_Port, LED2_Pin, GPIO_PIN_RESET);
-
-			  /*while((max_retry_counter < 5) && HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, 20) != HAL_OK)
-			  {
-				  max_retry_counter++;
-			  }*/
-			  //while(HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, 20) != HAL_OK);
-			  //while(HAL_I2C_GetState(&hi2c1) != HAL_I2C_STATE_READY);
-			  //HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
-
-			  /*if(packets_to_receive_counter > 0)
-			  {
-				  HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)packets_to_receive[packets_to_receive_counter].payload, 34, HAL_MAX_DELAY);
-				  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
-
-				  for(int i = 0; i < packets_to_receive_counter - 1; i++)
-				  {
-					  packets_to_receive[i].width = packets_to_receive[i+1].width;
-					  packets_to_receive[i].reliable = 0;
-
-					  for(int j = 0; j < 35; j++)
-					  {
-						  packets_to_receive[i].payload[j] = packets_to_receive[i+1].payload[j];
-					  }
-				  }
-
-				  packets_to_receive_counter--;
-			  }
-			  else
-			  {
-				  HAL_I2C_Slave_Transmit(&hi2c1, (uint8_t *)empty_data_packet.payload, 34, HAL_MAX_DELAY);
-				  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
-			  }*/
-		  }
-		  else
-		  {
-			  new_packet_to_send_available = 1;
-
-			  current_i2c_packet.width = current_i2c_packet.payload[32];
-			  current_i2c_packet.reliable = current_i2c_packet.payload[33];
-
-			  if(current_i2c_packet.reliable && reliable_packet_to_gcs_counter < 31)
-			  {
-				  reliable_packets_to_gcs[reliable_packet_to_gcs_counter].width = current_i2c_packet.width;
-				  reliable_packets_to_gcs[reliable_packet_to_gcs_counter].reliable = 1;
-				  for(int i = 0; i < 35; i++)
-				  {
-					  reliable_packets_to_gcs[reliable_packet_to_gcs_counter].payload[i] = current_i2c_packet.payload[i];
-				  }
-
-				  reliable_packet_to_gcs_counter++;
-			  }
-			  else if(current_i2c_packet.reliable == 0)
-			  {
-				  unreliable_packet.width = current_i2c_packet.width;
-				  unreliable_packet.reliable = 0;
-
-				  for(int i = 0; i < 35; i++)
-				  {
-					  unreliable_packet.payload[i] = current_i2c_packet.payload[i];
-				  }
-			  }
-
-			  HAL_I2C_Slave_Receive_IT(&hi2c1, (uint8_t *)current_i2c_packet.payload, 35);
-		  }
-	  }
+	  GPS_Read();
 
     /* USER CODE END WHILE */
 

@@ -11,8 +11,11 @@
 #include "stm32f4xx_hal.h"
 
 void telem_loop(void);
+void SendDynamicVariable(const char *varName, uint8_t varType, uint8_t *num);
+void SendDirectVariablePacket(uint8_t varcount, uint8_t index[]);
 void ClearManualBuffer(void);
 void ClearPrintBuffer(void);
+void ClearDynamicVariableBuffer(void);
 void PrintManualPacket(void);
 void AddToAutoBuffer(uint8_t buf_index, uint8_t *num, uint8_t size);
 void AddIDToManualBuffer(uint8_t id);
@@ -39,7 +42,7 @@ typedef struct
 } data_packet;
 
 extern char print_text_buffer[32];
-
+extern char dynamic_variable_buffer[32];
 extern volatile uint8_t telem_send_buffer[35];
 extern volatile uint8_t telem_receive_buffer[35];
 extern data_packet empty_data_packet;
@@ -69,6 +72,8 @@ enum
     GPS_PACKET = 0x08,
     PRINT_PACKET = 0x09,
     STATUS_FIRST_PACKET = 0x0A,
+	READ_VARIABLE_PACKET = 0x0B,
+	DYNAMIC_VARIABLE_PACKET = 0x0C,
 
     PID_GAIN_FIRST_REQUEST = 0xF3,
     PID_GAIN_SECOND_REQUEST = 0xF4,
@@ -80,11 +85,13 @@ enum
     CALIBRATE_COMPASS_REQUEST = 0xFA,
     CALIBRATE_ESC_REQUEST = 0xFB,
 	FLIGHT_MODE_UPDATE_REQUEST = 0xFC,
-    GPS_PACKET_UPDATE_REQUEST = 0xFD,
+    GPS_PACKET_UPDATE = 0xFD,
     GPS_PACKET_REQUEST = 0xFE,
-    GPS_HOLD_COPY_BUFFER_REQUEST = 0xE0,
-	UPLOAD_CMD_PACKET = 0xE1,
-	DO_CMD_PACKET = 0xE2
+    GPS_MEM_PACKET_UPDATE = 0xE0,
+	UPLOAD_CMD_REQUEST = 0xE1,
+	DO_CMD_REQUEST = 0xE2,
+	MODIFY_VARIABLE_REQUEST = 0xE3,
+	READ_VARIABLE_REQUEST = 0xE4
 };
 
 #endif /* INC_TELEMETRY_H_ */

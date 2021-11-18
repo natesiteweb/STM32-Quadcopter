@@ -51,11 +51,34 @@ extern "C" {
 
 extern uint8_t read_flag;
 extern uint32_t how_long_to_loop_main;
+extern uint32_t main_cycle_counter;
 extern float how_long_to_loop_modifier;
 extern volatile int32_t ppm_channels[6];
 extern uint32_t main_loop_timer;
 
 extern uint8_t altitude_hold_flag;
+extern uint8_t gps_hold_flag;
+extern uint8_t last_gps_hold_flag;
+extern uint8_t gps_waypoint_flag;
+extern uint8_t optical_flow_flag;
+extern uint8_t new_camera_data;
+
+extern uint32_t camera_request_timer;
+extern uint8_t camera_receive_flag;
+extern uint8_t camera_waiting_flag;
+extern uint8_t camera_receive_buf[32];
+extern uint8_t camera_send_buf[32];
+extern float camera_displacement_x;
+extern float camera_displacement_y;
+extern float camera_velocity_x;
+extern float camera_velocity_y;
+extern int32_t camera_framerate;
+
+extern int32_t raw_camera_x_velocity;
+extern int32_t raw_camera_y_velocity;
+
+extern int32_t last_camera_x_velocity;
+extern int32_t last_camera_y_velocity;
 
 /* USER CODE END EM */
 
@@ -71,6 +94,7 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c);
 void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c);
 void HAL_I2C_AbortCpltCallback(I2C_HandleTypeDef *hi2c);
 void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c);
+void ReadCamera();
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim);
 uint32_t GetMicros();
 uint32_t GetMillis();

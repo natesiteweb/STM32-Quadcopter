@@ -51,8 +51,8 @@ void Setup_Compass()
 	gyro_z_angle = compass_heading;
 }
 
-float x_angle_offset = 2.00;
-float y_angle_offset = 3.00;
+float x_angle_offset = 1.00;//2.00
+float y_angle_offset = 2.00;//3.00
 
 void Read_Compass()
 {
@@ -80,7 +80,7 @@ void Read_Compass()
 		compass_heading = atan2f((float)comY, (float)comX) * 57.29577;
 
 	compass_heading = -compass_heading;
-	compass_heading -= 5;
+	//compass_heading -= 5;
 
 	if (compass_heading < 0)
 		compass_heading += 360;
@@ -99,7 +99,7 @@ void Calibrate_Compass()
 
 	calibrate_compass_timer = GetMillis();
 
-	while(GetMillisDifference(&calibrate_compass_timer) < 8000)
+	while(GetMillisDifference(&calibrate_compass_timer) < 10000)
 	{
 		HAL_I2C_Mem_Read(&hi2c1, COMPASS_ADDR, 0x03, I2C_MEMADD_SIZE_8BIT,  (uint8_t *)&raw_compass_data, 6, HAL_MAX_DELAY);
 

@@ -27,6 +27,7 @@ float gyro_x, gyro_y, gyro_z;
 float acc_magnitude, acc_x, acc_y, acc_z, acc_magnitude_at_start;
 float gyro_x_angle, gyro_y_angle, gyro_z_angle;
 float gyro_x_calibration, gyro_y_calibration, gyro_z_calibration;
+float acc_x_g, acc_y_g, acc_z_g, acc_z_start;
 
 void Setup_IMU()
 {
@@ -67,6 +68,7 @@ void Calibrate_IMU()
 		gyro_x_calibration += raw_gyro_acc_data[0];
 		gyro_y_calibration += raw_gyro_acc_data[1];
 		gyro_z_calibration += raw_gyro_acc_data[2];
+		acc_z_start += raw_gyro_acc_data[5];
 		HAL_Delay(2);
 	}
 
@@ -77,6 +79,7 @@ void Calibrate_IMU()
 	gyro_x_calibration /= 2000;
 	gyro_y_calibration /= 2000;
 	gyro_z_calibration /= 2000;
+	acc_z_start /= 2000;
 }
 
 void Read_IMU(uint8_t is_calibrating)
@@ -95,5 +98,7 @@ void Read_IMU(uint8_t is_calibrating)
 		raw_gyro_acc_data[0] -= gyro_x_calibration;
 		raw_gyro_acc_data[1] -= gyro_y_calibration;
 		raw_gyro_acc_data[2] -= gyro_z_calibration;
+
+		acc_z_g = (float)(raw_gyro_acc_data[5] - acc_z_start) / 16384.0f;
 	}
 }

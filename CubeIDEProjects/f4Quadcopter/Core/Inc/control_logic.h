@@ -13,19 +13,23 @@
 void Calculate_Attitude(void);
 void Motor_PID(void);
 void Calculate_Motor_Outputs(void);
+void Init_Altitude_Kalman(void);
+void Calculate_Altitude_Filter(void);
 void Calculate_Altitude_PID(void);
-void Control_Loop(void);
-uint16_t Parse_Command(uint8_t *cmd_array, uint16_t cmd_index, uint8_t high_priority);
-void Parse_Requested_State(int32_t requested_state);
+void GPS_PID(void);
+void OpticalFlow_PID(void);
 void Launch_Behavior(void);
 void Land_Behavior(void);
 
 typedef struct
 {
-	uint8_t *var;
-	uint8_t protected;
-} direct_access_var;
+	uint8_t row;
+	uint8_t col;
 
+	float data[4*4];	//max 4X4 matrix
+} matrix;
+
+matrix Multiple_Matrix(matrix *a, matrix *b);
 
 extern int32_t pid_roll_output, pid_pitch_output, pid_yaw_output;
 extern float kp_roll, kp_yaw;
@@ -38,15 +42,7 @@ extern float calculated_bmp_altitude;
 extern float pid_current_altitude_setpoint;
 extern float pid_altitude_setpoint;
 
-extern direct_access_var direct_access_variables[256];
-extern uint8_t program_buffer[512];
-
-extern uint8_t high_priority_program_buffer[32];
-extern uint8_t high_priority_program_counter;
-extern uint8_t high_priority_program_width;
-
 extern uint8_t launched, launching, landing;
-extern uint8_t ready_for_next_command;
 extern uint8_t manual_mode;
 
 extern float hover_throttle;
@@ -54,11 +50,61 @@ extern int32_t idle_throttle;
 extern uint32_t launch_timer;
 
 extern float slow_bmp_altitude;
+extern float kalman_x;
+extern float kalman_x_new, kalman_xa_new;
+extern float kalman_gain;
+extern float kalman_measured_vel;
 extern float pid_altitude_setpoint;
 extern float pid_alt_last_error;
 extern int32_t altitude_pid_output;
 extern float kp_alt, ki_alt, kd_alt;
 extern float pid_alt_i;
+
+extern double current_state[2*1];
+extern double kalman_gain_matrix[2*1];
+
+extern float current_state_float;
+extern float kalman_gain_float;
+extern double current_state_double;
+extern double kalman_gain_double;
+
+
+extern float pid_altitude_over_time_total, pid_altitude_over_time[20];
+extern uint8_t pid_altitude_over_time_reading_index;
+
+/*
+ * Waypoints
+ * 0: Home
+ */
+extern int32_t lat_mem[200], lon_mem[200];
+extern float alt_mem[200];
+
+extern uint8_t sat_count;
+extern int32_t raw_gps_lat, raw_gps_lon;
+extern uint8_t new_gps_data;
+extern int32_t last_raw_gps_lat, last_raw_gps_lon;
+extern int32_t current_lat_setpoint, current_lon_setpoint;
+extern uint8_t gps_setpoint;
+
+extern float calculated_lat_error, calculated_lon_error;
+extern float lat_add, lon_add;
+
+extern float lat_error_over_time_total, lon_error_over_time_total;
+extern float lat_error_over_time[50], lon_error_over_time[50];
+extern uint8_t gps_error_over_time_reading_index;
+
+extern float last_calculated_lat_error, last_calculated_lon_error;
+
+extern float kp_gps, kp_gps_actual, ki_gps, kd_gps;
+extern float pid_gps_i;
+
+extern int32_t gps_roll_modifier, gps_pitch_modifier;
+extern float gps_roll_modifier_north, gps_pitch_modifier_north;
+
+extern float camera_roll_modifier, camera_pitch_modifier;
+extern float kp_camera, kp_camera_actual, ki_camera, kd_camera;
+extern float pid_camera_x_i, pid_camera_y_i;
+extern float last_camera_roll_error, last_camera_pitch_error;
 
 enum
 {

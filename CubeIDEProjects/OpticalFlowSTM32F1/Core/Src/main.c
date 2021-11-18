@@ -27,6 +27,8 @@
 #include "fonts.h"
 #include "GFX_FUNCTIONS.h"
 #include "ov7670.h"
+#include "string.h"
+#include "stdio.h"
 
 /* USER CODE END Includes */
 
@@ -51,18 +53,25 @@ SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+DMA_HandleTypeDef hdma_tim2_ch1;
+
+UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+
+uint8_t print_text_buffer[32];
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -100,16 +109,25 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_TIM2_Init();
   MX_I2C1_Init();
   MX_SPI2_Init();
   MX_TIM3_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  HAL_GPIO_WritePin(CAM_RST_GPIO_Port, CAM_RST_Pin, GPIO_PIN_RESET);
 
   ST7735_Init(0);
   fillScreen(BLACK);
-  testAll();
-  HAL_Delay(1000);
+  //testAll();
+  HAL_Delay(200);
+
+  HAL_GPIO_WritePin(CAM_RST_GPIO_Port, CAM_RST_Pin, GPIO_PIN_SET);
+  HAL_Delay(50);
+  Camera_Init();
+  HAL_Delay(500);
 
   /* USER CODE END 2 */
 
@@ -117,7 +135,88 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  ST7735_SetRotation(0);
+	  //HAL_Delay(20);
+	  //sprintf((char *)print_text_buffer, "%ud%s", line_count, "\n");
+	  //HAL_UART_Transmit(&huart1, print_text_buffer, strlen((char*)print_text_buffer), HAL_MAX_DELAY);
+	  //HAL_TIM_IRQHandler(htim);
+
+	  //line_count = 0;
+
+	  //HAL_TIM_IC_Start_IT(&htim3, TIM_CHANNEL_3);
+	  TIM3->DIER = TIM_DIER_CC3IE;
+	  TIM3->CR1 = TIM_CR1_CEN;
+
+	  while(!frame_captured);
+
+	  //sprintf((char *)print_text_buffer, "%lu%s", line_count, "\n");
+	  //HAL_UART_Transmit(&huart1, print_text_buffer, strlen((char*)print_text_buffer), HAL_MAX_DELAY);
+
+	  //HAL_TIM_IC_Stop_IT(&htim2, TIM_CHANNEL_2);
+	  //HAL_TIM_IC_Stop_IT(&htim3, TIM_CHANNEL_3);
+
+	  //TIM2->DIER &= ~TIM_DIER_CC1DE;
+
+	  //TIM3->CR1 &= ~TIM_CR1_CEN;
+	  //TIM2->CR1 &= ~TIM_CR1_CEN;
+
+
+	  ST7735_Select();
+
+	  ST7735_SetAddressWindow(0, 0, 127, 90);
+
+	  for(int j = 0; j < 80; j++)
+	  {
+		  for(int i = 0; i < 128; i++)
+		  {
+			  uint16_t color_to_send = (uint16_t)((RED & (uint16_t)((uint16_t)temp_data_line[i + (j * 128)] << 8))/* | (GREEN & (uint16_t)((uint16_t)temp_data_line[i + (j * 256)] << 5)) | (BLUE & (uint16_t)temp_data_line[i + (j * 256)])*/);
+			  //uint16_t color_to_send = ((((uint16_t)temp_data_line[i+1 + (j * 256)]) << 8) & 0xFF00) | (((uint16_t)temp_data_line[i + (j * 256)]) & 0x00FF);
+			  //uint16_t color_to_send2 = ((color_to_send & RED) >> 11) | ((color_to_send & BLUE) << 11);// | (color_to_send & GREEN);
+			  uint16_t color_to_send2 = color_to_send;//temp_data_line[i + (j * 256)] & BLUE;
+			  //color_to_send = RED;
+			  uint8_t data[] = { color_to_send2 >> 8, color_to_send2 & 0xFF };
+			  //uint8_t data[] = { temp_data_line[i + (j * 256)], temp_data_line[i+1 + (j * 256)] };
+			  ST7735_WriteData(data, sizeof(data));
+
+			  //ST7735_DrawPixel(i, (uint16_t)j, color_to_send);
+
+			  //drawLine(i, 0, i, 20, color_to_send);
+			  //HAL_Delay(5);
+		  }
+	  }
+
+	  //ST7735_WriteData(temp_data_line, 30*256);
+
+	  ST7735_Unselect();
+
+	  //HAL_UART_Transmit(&huart1, temp_data_line, 10240, HAL_MAX_DELAY);
+
+	  //hsync_flag = 0;
+
+	  frame_captured = 0;
+
+	  //TIM2->DIER |= TIM_DIER_CC1DE;
+	  //TIM2->DIER |= TIM_DIER_CC2IE;
+
+	  //TIM3->CR1 = TIM_CR1_CEN;
+
+	  //HAL_Delay(500);
+
+	  //sprintf((char *)print_text_buffer, "%hd%s", temp_data_line[50], "\n");
+	  //HAL_UART_Transmit(&huart1, print_text_buffer, strlen((char*)print_text_buffer), HAL_MAX_DELAY);
+
+	  //drawLine(0, line_count, 128, 1, BLACK);
+	  //very slow test
+	  /*if(line_count < 128)
+		  {
+			  for(int i = 0; i < 128; i++)
+			  {
+				  uint16_t color_to_send = (uint16_t)((RED & (uint16_t)(temp_data_line[i] << 10)) | (GREEN & (uint16_t)(temp_data_line[i] << 5)) | (BLUE & (uint16_t)temp_data_line[i]));
+				  ST7735_DrawPixel(i, line_count, color_to_send);
+				  //drawLine(i, 0, i, 20, color_to_send);
+				  //HAL_Delay(5);
+			  }
+		  }*/
+	  /*ST7735_SetRotation(0);
 	  ST7735_WriteString(0, 0, "HELLO", Font_11x18, RED,BLACK);
 	  HAL_Delay(1000);
 	  fillScreen(BLACK);
@@ -135,7 +234,7 @@ int main(void)
 	  ST7735_SetRotation(3);
 	  ST7735_WriteString(0, 0, "ControllersTech", Font_16x26, YELLOW,BLACK);
 	  HAL_Delay(1000);
-	  fillScreen(BLACK);
+	  fillScreen(BLACK);*/
 
     /* USER CODE END WHILE */
 
@@ -240,7 +339,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -277,7 +376,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 0;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 65535;
+  htim2.Init.Period = 1;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -301,8 +400,14 @@ static void MX_TIM2_Init(void)
   }
   sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
   sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
-  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV2;
   sConfigIC.ICFilter = 0;
+  if (HAL_TIM_IC_ConfigChannel(&htim2, &sConfigIC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_FALLING;
+  sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
   if (HAL_TIM_IC_ConfigChannel(&htim2, &sConfigIC, TIM_CHANNEL_2) != HAL_OK)
   {
     Error_Handler();
@@ -357,7 +462,7 @@ static void MX_TIM3_Init(void)
   {
     Error_Handler();
   }
-  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
+  sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_FALLING;
   sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
   sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
   sConfigIC.ICFilter = 0;
@@ -365,13 +470,58 @@ static void MX_TIM3_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_TIM_IC_ConfigChannel(&htim3, &sConfigIC, TIM_CHANNEL_4) != HAL_OK)
-  {
-    Error_Handler();
-  }
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 460800;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 
 }
 
@@ -390,7 +540,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, SPI_RST_Pin|SPI_CS_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, CAM_RST_Pin|SPI_RST_Pin|SPI_CS_Pin|GPIO_PIN_8, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : CAM_D0_Pin CAM_D1_Pin CAM_D2_Pin CAM_D3_Pin
                            CAM_D4_Pin CAM_D5_Pin CAM_D6_Pin CAM_D7_Pin */
@@ -400,18 +550,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : CAM_RST_Pin SPI_RST_Pin SPI_CS_Pin PB8 */
+  GPIO_InitStruct.Pin = CAM_RST_Pin|SPI_RST_Pin|SPI_CS_Pin|GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
   /*Configure GPIO pin : PA8 */
   GPIO_InitStruct.Pin = GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : SPI_RST_Pin SPI_CS_Pin PB8 */
-  GPIO_InitStruct.Pin = SPI_RST_Pin|SPI_CS_Pin|GPIO_PIN_8;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 

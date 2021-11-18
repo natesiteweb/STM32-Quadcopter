@@ -23,6 +23,7 @@
 #include "stm32f1xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "ov7670.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,7 +57,9 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-
+extern DMA_HandleTypeDef hdma_tim2_ch1;
+extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim3;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -196,6 +199,99 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f1xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles DMA1 channel5 global interrupt.
+  */
+void DMA1_Channel5_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Channel5_IRQn 0 */
+
+  /* USER CODE END DMA1_Channel5_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_tim2_ch1);
+  /* USER CODE BEGIN DMA1_Channel5_IRQn 1 */
+
+  /* USER CODE END DMA1_Channel5_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM2 global interrupt.
+  */
+void TIM2_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM2_IRQn 0 */
+
+	if((TIM2->SR & TIM_SR_CC2IF) != 0x00)
+	{
+		TIM2->DIER &= ~TIM_DIER_CC1DE;
+		TIM2->DIER &= ~TIM_DIER_CC2IE;
+		TIM2->SR &= ~TIM_SR_CC1IF;
+		//TIM2->DIER &= ~TIM_DIER_CC2IE;
+
+		DMA1_Channel5->CCR = 0;
+		DMA1_Channel5->CNDTR = (uint16_t)128;
+		DMA1_Channel5->CMAR = (uint32_t)(temp_data_line + (line_count * 128));
+		DMA1_Channel5->CCR = DMA_CCR_PL | DMA_CCR_MINC | DMA_CCR_EN;
+
+		line_count++;
+
+		if(line_count > 80)
+		{
+			frame_captured = 1;
+
+			TIM3->DIER = 0;
+			TIM2->DIER = 0;
+			TIM3->CR1 &= ~TIM_CR1_CEN;
+			TIM2->CR1 &= ~TIM_CR1_CEN;
+		}
+		else
+		{
+			TIM2->DIER |= TIM_DIER_CC1DE;
+			TIM2->DIER |= TIM_DIER_CC2IE;
+		}
+	}
+
+	TIM2->CCR2;
+	TIM2->SR &= ~TIM_SR_CC2IF;
+
+	return;
+
+  /* USER CODE END TIM2_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim2);
+  /* USER CODE BEGIN TIM2_IRQn 1 */
+
+  /* USER CODE END TIM2_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM3 global interrupt.
+  */
+void TIM3_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM3_IRQn 0 */
+
+	if((TIM3->SR & TIM_SR_CC3IF) != 0x00)
+	{
+		line_count = 0;
+
+		if(~TIM2->CR1 & TIM_CR1_CEN)
+		{
+			TIM2->DIER = TIM_DIER_CC2IE;
+			TIM2->CR1 = TIM_CR1_CEN;
+		}
+	}
+
+	TIM3->CCR3;
+	TIM3->SR &= ~TIM_SR_CC3IF;
+
+	return;
+
+  /* USER CODE END TIM3_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim3);
+  /* USER CODE BEGIN TIM3_IRQn 1 */
+
+  /* USER CODE END TIM3_IRQn 1 */
+}
 
 /* USER CODE BEGIN 1 */
 

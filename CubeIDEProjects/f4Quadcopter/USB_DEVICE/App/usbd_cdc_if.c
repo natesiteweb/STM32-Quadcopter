@@ -181,6 +181,11 @@ static int8_t CDC_DeInit_FS(void)
 static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 {
   /* USER CODE BEGIN 5 */
+
+	static uint8_t lineCoding[7] // <------- add these three lines
+							  // 115200bps, 1stop, no parity, 8bit
+							  = {0x00, 0xC2, 0x01, 0x00, 0x00, 0x00, 0x08};
+
   switch(cmd)
   {
     case CDC_SEND_ENCAPSULATED_COMMAND:
@@ -221,12 +226,12 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
   /* 6      | bDataBits  |   1   | Number Data bits (5, 6, 7, 8 or 16).          */
   /*******************************************************************************/
     case CDC_SET_LINE_CODING:
-
-    break;
+    	memcpy( lineCoding, pbuf, sizeof(lineCoding) ); // <-- add this line
+    	break;
 
     case CDC_GET_LINE_CODING:
-
-    break;
+    	memcpy( pbuf, lineCoding, sizeof(lineCoding) ); // <-- add this line
+    	break;
 
     case CDC_SET_CONTROL_LINE_STATE:
 

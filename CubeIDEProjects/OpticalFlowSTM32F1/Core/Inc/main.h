@@ -38,6 +38,15 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 
+extern I2C_HandleTypeDef hi2c1;
+extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim3;
+extern DMA_HandleTypeDef hdma_tim2_ch1;
+extern UART_HandleTypeDef huart1;
+extern DMA_HandleTypeDef hdma_usart1_tx;
+
+extern uint8_t print_text_buffer[32];
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -74,12 +83,14 @@ void Error_Handler(void);
 #define CAM_D6_GPIO_Port GPIOA
 #define CAM_D7_Pin GPIO_PIN_7
 #define CAM_D7_GPIO_Port GPIOA
-#define HSYNC_Pin GPIO_PIN_0
-#define HSYNC_GPIO_Port GPIOB
-#define VSYNC_Pin GPIO_PIN_1
+#define VSYNC_Pin GPIO_PIN_0
 #define VSYNC_GPIO_Port GPIOB
-#define PCLK_Pin GPIO_PIN_3
-#define PCLK_GPIO_Port GPIOB
+#define CAM_RST_Pin GPIO_PIN_1
+#define CAM_RST_GPIO_Port GPIOB
+#define PCLK_Pin GPIO_PIN_15
+#define PCLK_GPIO_Port GPIOA
+#define HSYNC_Pin GPIO_PIN_3
+#define HSYNC_GPIO_Port GPIOB
 #define SPI_RST_Pin GPIO_PIN_4
 #define SPI_RST_GPIO_Port GPIOB
 #define SPI_CS_Pin GPIO_PIN_5

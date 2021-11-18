@@ -1,0 +1,8 @@
+d = 27cm
+real y = 5.8cm
+37px
+px/cm = 0.1568
+1px = 3.36
+
+x = tan(pixels * 0.21875) * distance
+y = tan(pixels * 0.3125) * distance
